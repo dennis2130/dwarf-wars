@@ -57,3 +57,44 @@ export const RACES = [
       startingDebt: 5000
     }
   ];
+
+  // ... (keep RACES and CLASSES as they are)
+
+export const EVENTS = [
+  { 
+    id: 'dragon', 
+    text: "A Dragon attacks the city! You get singed escaping.", 
+    type: 'damage', 
+    value: 25 
+  },
+  { 
+    id: 'mugger', 
+    text: "A thief bumps into you in the crowd.", 
+    type: 'theft', 
+    value: 0.15 // Lose 15% of gold
+  },
+  { 
+    id: 'healer', 
+    text: "A cleric blesses you on your journey.", 
+    type: 'heal', 
+    value: 20 
+  },
+  { 
+    id: 'find', 
+    text: "You find a dropped coin purse.", 
+    type: 'money', 
+    value: 100 
+  },
+  { 
+    id: 'sale', 
+    text: "A local merchant is liquidating stock! Prices are low.", 
+    type: 'price', 
+    value: 0.5 // Prices cut in half
+  },
+  { 
+    id: 'riot', 
+    text: "Riots in the street! Prices are sky high.", 
+    type: 'price', 
+    value: 2.0 // Prices double
+  }
+];
