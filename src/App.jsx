@@ -95,6 +95,23 @@ function App() {
     }
   };
 
+    const deleteCharacter = async (e, id) => {
+    // Stop the click from bubbling up (so we don't accidentally load the character while deleting it)
+    e.stopPropagation(); 
+    
+    if (!window.confirm("Are you sure you want to banish this hero forever?")) return;
+
+    const { error } = await supabase
+      .from('saved_characters')
+      .delete()
+      .eq('id', id);
+
+    if (!error) {
+      // Update the UI immediately without reloading
+      setSavedChars(savedChars.filter(char => char.id !== id));
+    }
+  };
+
   const saveScore = async () => {
     setIsSaving(true);
     await supabase.from('high_scores').insert([{
@@ -244,9 +261,22 @@ function App() {
                 <h3 className="text-xs font-bold text-slate-400 uppercase mb-2">Saved Heroes</h3>
                 <div className="flex gap-2 overflow-x-auto pb-2">
                     {savedChars.map(char => (
-                        <div key={char.id} onClick={() => loadCharacter(char)} className="flex-shrink-0 bg-slate-800 p-3 rounded border border-slate-600 w-32 cursor-pointer hover:bg-slate-700">
-                            <div className="font-bold text-yellow-500 truncate">{char.name}</div>
+                        <div 
+                          key={char.id} 
+                          onClick={() => loadCharacter(char)} 
+                          className="relative flex-shrink-0 bg-slate-800 p-3 rounded border border-slate-600 w-32 cursor-pointer hover:bg-slate-700 group"
+                        >
+                            <div className="font-bold text-yellow-500 truncate pr-4">{char.name}</div>
                             <div className="text-[10px] text-slate-400">{char.race_id} / {char.class_id}</div>
+                            
+                            {/* DELETE BUTTON (Visible on Hover) */}
+                            <button 
+                                onClick={(e) => deleteCharacter(e, char.id)}
+                                className="absolute top-1 right-1 text-slate-500 hover:text-red-500 font-bold px-1"
+                                title="Delete Hero"
+                            >
+                                ✕
+                            </button>
                         </div>
                     ))}
                 </div>
