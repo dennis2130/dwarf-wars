@@ -206,6 +206,15 @@ function App() {
     }
   };
 
+    const payDebt = () => {
+    if (money > 0 && debt > 0) {
+      const amount = Math.min(money, debt);
+      setMoney(money - amount);
+      setDebt(debt - amount);
+      setLog(prev => [`Paid ${amount}g to the Loan Shark.`, ...prev]);
+    }
+  };
+
   const travel = () => {
     if (day >= MAX_DAYS) return triggerGameOver();
     setDay(day + 1);
