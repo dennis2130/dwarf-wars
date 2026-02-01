@@ -1,8 +1,42 @@
+/**
+ * App.jsx
+ *
+ * Main React component for Dwarf Wars.
+ * Handles all game logic, UI rendering, and state management.
+ *
+ * Major Features:
+ * - Character creation (name, race, class)
+ * - Game state management (start, playing, gameover)
+ * - Trading system (buy/sell items, price calculation)
+ * - Inventory and upgrades
+ * - Health, defense, and survival mechanics
+ * - Location travel and random events
+ * - Debt and scoring system
+ * - Supabase integration for authentication, saved characters, and leaderboard
+ * - Exit and restart functionality
+ *
+ * Key Methods:
+ * - startGame: Initializes a new game session
+ * - triggerGameOver: Ends the game and saves score
+ * - buyItem, sellItem: Trading logic
+ * - buyUpgrade: Purchase upgrades
+ * - payDebt: Pay off debt
+ * - travel: Move to a new location and trigger events
+ * - handleGoogleLogin, handleLogout: Auth management
+ * - fetchLeaderboard, fetchSavedCharacters, saveNewCharacter, deleteCharacter, saveScore: Supabase DB methods
+ * - loadCharacter: Load a saved character
+ * - recalcPrices, triggerRandomEvent: Price and event logic
+ *
+ * UI Structure:
+ * - Start screen (character creation, login, saved characters)
+ * - Main game (market, upgrades, travel, inventory, log)
+ * - Game over screen (final score, restart)
+ */
 import { useState, useEffect } from 'react'
-import { RACES, CLASSES, EVENTS, LOCATIONS, UPGRADES } from './gameData'
+import { RACES, CLASSES, EVENTS, LOCATIONS, UPGRADES, BASE_PRICES } from './gameData' 
 import { supabase } from './supabaseClient'
 // 1. VISUALS: Import Icons
-import { Coins, Skull, Heart, Shield, ShoppingBag, Map, Gem, UtensilsCrossed, FlaskConical, Sword } from 'lucide-react'
+import { Coins, Skull, Heart, Shield, ShoppingBag, Map, Gem, UtensilsCrossed, FlaskConical, Sword, RotateCcw, LogOut } from 'lucide-react'
 
 function App() {
   // --- AUTH STATE ---
@@ -29,14 +63,13 @@ function App() {
   const [money, setMoney] = useState(100);
   const [debt, setDebt] = useState(5000);
   const [day, setDay] = useState(1);
-  const [inventory, setInventory] = useState({ rations: 0, potions: 0, gems: 0 });
+  const [inventory, setInventory] = useState({}); // Start empty
   const [currentLocation, setCurrentLocation] = useState(LOCATIONS[0]); // Defaults to Royal City
   const [log, setLog] = useState([]);
   const [eventMsg, setEventMsg] = useState(null);
 
   // --- CONFIG ---
   const MAX_DAYS = 31;
-  const BASE_PRICES = { rations: 10, potions: 150, gems: 1000 };
   const [currentPrices, setCurrentPrices] = useState(BASE_PRICES);
 
   // --- INIT ---
@@ -110,7 +143,7 @@ function App() {
     setPlayer({ name: char.name, race: raceObj, class: classObj });
   };
 
-  const startGame = () => {
+const startGame = () => {
     if(!player.name || !player.race || !player.class) return alert("Complete your character!");
 
     let inv = 20 + player.race.stats.inventory;
@@ -118,7 +151,6 @@ function App() {
     let pm = 1.0 - player.race.stats.haggle;
     let def = 0;
     
-    // Orc Bonus: Start with a Club (Logic only, no item)
     if (player.race.id === 'orc') def += 5; 
     if (player.class.id === 'warrior') hp += 50;
     
@@ -131,15 +163,31 @@ function App() {
     setDefense(def);
     setPlayerItems([]);
     setDay(1);
-    setInventory({ rations: 0, potions: 0, gems: 0 });
+    const initialInv = {};
+    Object.keys(BASE_PRICES).forEach(key => initialInv[key] = 0);
+    setInventory(initialInv);
     
-    // 2. LOCATION LOGIC: Set Initial Prices based on Royal City
+    // RESET LOCATION & PRICES
     const startLoc = LOCATIONS[0];
     setCurrentLocation(startLoc);
-    recalcPrices(startLoc);
+    recalcPrices(startLoc); // Ensure prices reset to base volatility
 
     setLog([`Welcome ${player.name} the ${player.race.name} ${player.class.name}!`, "Good luck."]);
     setGameState('playing');
+  };
+
+  // NEW: Restart with same character
+  const handleRestart = () => {
+    if (window.confirm("Restart this run? You will lose current progress.")) {
+        startGame();
+    }
+  };
+
+  // NEW: Quit to Main Menu
+  const handleQuit = () => {
+    if (window.confirm("Quit to Character Select?")) {
+        setGameState('start');
+    }
   };
 
   const triggerGameOver = () => {
@@ -352,9 +400,39 @@ function App() {
   // --- RENDER: MAIN GAME (PLAYING) ---
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 font-sans p-4 max-w-md mx-auto border-x border-slate-700 flex flex-col">
-      <header className="flex justify-between items-start mb-4 border-b border-slate-700 pb-2">
-        <div><h1 className="text-xl font-bold text-yellow-500">{player.name}</h1><p className="text-xs text-slate-400 capitalize">{player.race?.name} {player.class?.name}</p></div>
-        <div className="text-right text-sm"><p>Day: <span className="text-white font-bold">{day}/{MAX_DAYS}</span></p><p className="text-xs text-blue-400 flex items-center justify-end gap-1"><Map size={12}/>{currentLocation.name}</p></div>
+<header className="flex justify-between items-start mb-4 border-b border-slate-700 pb-2">
+        <div>
+            <h1 className="text-xl font-bold text-yellow-500">{player.name}</h1>
+            <p className="text-xs text-slate-400 capitalize">{player.race?.name} {player.class?.name}</p>
+        </div>
+        
+        <div className="flex flex-col items-end gap-1">
+            {/* Day and Location */}
+            <div className="text-right text-sm">
+                <span className="text-white font-bold mr-2">Day {day}/{MAX_DAYS}</span>
+                <span className="text-xs text-blue-400 inline-flex items-center gap-1">
+                    <Map size={12}/>{currentLocation.name}
+                </span>
+            </div>
+
+            {/* NEW: Quit / Restart Buttons */}
+            <div className="flex gap-2 mt-1">
+                <button 
+                    onClick={handleRestart} 
+                    className="p-1 rounded bg-slate-800 text-slate-400 hover:text-green-400 hover:bg-slate-700 transition-colors"
+                    title="Restart Run"
+                >
+                    <RotateCcw size={16} />
+                </button>
+                <button 
+                    onClick={handleQuit} 
+                    className="p-1 rounded bg-slate-800 text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors"
+                    title="Quit to Menu"
+                >
+                    <LogOut size={16} />
+                </button>
+            </div>
+        </div>
       </header>
 
       {eventMsg && <div className={`mb-4 p-3 rounded text-center text-sm font-bold border ${eventMsg.type === 'damage' || eventMsg.type === 'theft' ? 'bg-red-900/50 border-red-500 text-red-200' : 'bg-green-900/50 border-green-500 text-green-200'}`}>{eventMsg.text}</div>}
