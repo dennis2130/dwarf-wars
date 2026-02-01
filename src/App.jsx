@@ -44,7 +44,7 @@ function useLongPress(callback, ms = 100) {
 
   const start = () => {
     if (timerRef.current) return;
-    callback(); // Fire once immediately
+    callback();
     timerRef.current = setInterval(callback, ms);
   };
 
@@ -63,6 +63,51 @@ function useLongPress(callback, ms = 100) {
     onTouchEnd: stop,
   };
 }
+
+
+  const MarketItem = ({ item, price, myAvg, haveStock, onBuy, onSell, onSellAll, icon }) => {
+    // Determine Profit Color
+    let priceColor = "text-yellow-500";
+    if (haveStock) {
+        if (price > myAvg) priceColor = "text-green-400"; // Profit
+        if (price < myAvg) priceColor = "text-red-400";   // Loss
+    }
+
+    // Now it is legal to call this hook here!
+    const buyEvents = useLongPress(onBuy);
+    const sellEvents = useLongPress(onSell);
+
+    return (
+        <div className="flex justify-between items-center p-3 border-b border-slate-700 last:border-0">
+            <div className="w-1/3">
+                <div className="font-bold text-slate-300 flex items-center gap-2 capitalize">
+                    {icon} {item}
+                </div>
+                {haveStock && (
+                    <div className="text-[10px] text-slate-500">
+                        Avg: {Math.floor(myAvg)}g
+                    </div>
+                )}
+            </div>
+            
+            <div className={`w-1/3 text-center font-mono ${priceColor}`}>
+                {price} g
+            </div>
+            
+            <div className="w-1/3 flex justify-end gap-1">
+                <button {...buyEvents} className="bg-green-700 hover:bg-green-600 px-3 py-2 rounded text-xs font-bold active:scale-95 transition-transform select-none">
+                    Buy
+                </button>
+                <button {...sellEvents} className="bg-red-700 hover:bg-red-600 px-3 py-2 rounded text-xs font-bold active:scale-95 transition-transform select-none">
+                    Sell
+                </button>
+                <button onClick={onSellAll} className="bg-slate-700 hover:bg-slate-600 px-2 py-2 rounded text-xs font-bold border border-slate-600" title="Sell All">
+                    All
+                </button>
+            </div>
+        </div>
+    );
+};
 
 function App() {
   // --- AUTH STATE ---
@@ -86,13 +131,16 @@ function App() {
   const [playerItems, setPlayerItems] = useState([]); 
 
   // --- GAME LOOP STATE ---
-  const [money, setMoney] = useState(100);
   const [debt, setDebt] = useState(5000);
   const [day, setDay] = useState(1);
-  const [inventory, setInventory] = useState({}); // Start empty
   const [currentLocation, setCurrentLocation] = useState(LOCATIONS[0]); // Defaults to Royal City
   const [log, setLog] = useState([]);
   const [eventMsg, setEventMsg] = useState(null);
+  const [resources, setResources] = useState({
+    money: 100,
+    inventory: { rations: { count: 0, avg: 0 }, potions: { count: 0, avg: 0 }, gems: { count: 0, avg: 0 } }
+  });
+  const { money, inventory } = resources;
 
   // --- CONFIG ---
   const MAX_DAYS = 31;
@@ -169,7 +217,7 @@ function App() {
     setPlayer({ name: char.name, race: raceObj, class: classObj });
   };
 
-const startGame = () => {
+  const startGame = () => {
     if(!player.name || !player.race || !player.class) return alert("Complete your character!");
 
     let inv = 50 + player.race.stats.inventory;
@@ -180,7 +228,16 @@ const startGame = () => {
     if (player.race.id === 'orc') def += 5; 
     if (player.class.id === 'warrior') hp += 50;
     
-    setMoney(player.class.startingMoney);
+    // --- UPDATED: Use setResources instead of setMoney/setInventory ---
+    const initialInv = {};
+    Object.keys(BASE_PRICES).forEach(key => initialInv[key] = { count: 0, avg: 0 });
+    
+    setResources({
+        money: player.class.startingMoney,
+        inventory: initialInv
+    });
+    // ------------------------------------------------------------------
+
     setDebt(player.class.startingDebt);
     setMaxInventory(inv);
     setMaxHealth(hp);
@@ -189,21 +246,15 @@ const startGame = () => {
     setDefense(def);
     setPlayerItems([]);
     setDay(1);
-    const initialInv = {};
-    Object.keys(BASE_PRICES).forEach(key => {
-        initialInv[key] = { count: 0, avg: 0 };
-    });
-    setInventory(initialInv);
     
     // RESET LOCATION & PRICES
     const startLoc = LOCATIONS[0];
     setCurrentLocation(startLoc);
-    recalcPrices(startLoc); // Ensure prices reset to base volatility
+    recalcPrices(startLoc); 
 
     setLog([`Welcome ${player.name} the ${player.race.name} ${player.class.name}!`, "Good luck."]);
     setGameState('playing');
   };
-
   // NEW: Restart with same character
   const handleRestart = () => {
     if (window.confirm("Restart this run? You will lose current progress.")) {
@@ -236,11 +287,15 @@ const startGame = () => {
     return newPrices;
   }
 
+  const updateMoney = (amount) => {
+      setResources(prev => ({ ...prev, money: Math.max(0, prev.money + amount) }));
+  };
+
   const triggerRandomEvent = (locObj) => {
     // Risk based on location
     if (Math.random() > locObj.risk) { 
         setEventMsg(null); 
-        return recalcPrices(locObj); // No event, just normal price flux
+        return recalcPrices(locObj); 
     }
 
     const event = EVENTS[Math.floor(Math.random() * EVENTS.length)];
@@ -249,7 +304,6 @@ const startGame = () => {
 
     switch(event.type) {
         case 'damage':
-            // 3. THEME: Defense check
             const dmg = Math.max(0, event.value - defense);
             setHealth(h => {
                 const newH = h - dmg;
@@ -263,13 +317,20 @@ const startGame = () => {
             msg += ` (+${event.value} HP)`; 
             break;
         case 'money': 
-            setMoney(m => m + event.value); 
+            // UPDATE: Use the new helper
+            updateMoney(event.value); 
             msg += ` (+${event.value} G)`; 
             break;
         case 'theft': 
-            const lost = Math.floor(money * event.value); 
-            setMoney(m => m - lost); 
-            msg += ` (-${lost} G)`; 
+            // UPDATE: Calculate theft based on current money
+            // We use a functional update here to ensure we steal from the *real* current amount
+            setResources(prev => {
+                const lost = Math.floor(prev.money * event.value);
+                // We have to modify the message "later" or just accept a generic message
+                // For simplicity, let's just log the generic message here
+                return { ...prev, money: prev.money - lost };
+            });
+            msg += ` (Thieves struck!)`; 
             break;
         case 'price': 
             eventPriceMod = event.value;
@@ -281,69 +342,91 @@ const startGame = () => {
     return recalcPrices(locObj, eventPriceMod);
   };
 
-  const buyItem = (item) => {
+
+const inventoryRef = useRef(inventory);
+useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
+
+const buyItem = (item) => {
+    // We calculate cost outside, but everything else happens inside the "Safe Zone"
     const cost = Math.ceil(currentPrices[item] * priceMod); 
     
-    // Calculate total count based on the new object structure
-    const totalItems = Object.values(inventory).reduce((a, b) => a + b.count, 0);
-    
-    if (totalItems >= maxInventory) return setLog(prev => ["Inventory full!", ...prev]);
-    
-    if (money >= cost) {
-      setMoney(money - cost);
-      
-      setInventory(prev => {
-        const current = prev[item];
-        // Calculate Weighted Average: (OldTotalCost + NewCost) / NewCount
-        const totalValue = (current.count * current.avg) + cost;
-        const newCount = current.count + 1;
+    setResources(prev => {
+        // 1. Validations using the 'prev' snapshot (Guaranteed latest data)
+        const currentMoney = prev.money;
+        const currentInv = prev.inventory;
+        const totalItems = Object.values(currentInv).reduce((a, b) => a + b.count, 0);
+
+        // Fail checks
+        if (totalItems >= maxInventory) return prev; // Inventory Full
+        if (currentMoney < cost) return prev;        // Not enough cash
+
+        // 2. Perform Math
+        const currentItemData = currentInv[item];
+        
+        // Weighted Average Math: ((OldCount * OldAvg) + NewCost) / NewCount
+        const totalValue = (currentItemData.count * currentItemData.avg) + cost;
+        const newCount = currentItemData.count + 1;
         const newAvg = totalValue / newCount;
 
+        // 3. Return NEW state (Money and Inventory updated together)
         return {
-            ...prev,
-            [item]: { count: newCount, avg: newAvg }
+            money: currentMoney - cost,
+            inventory: {
+                ...currentInv,
+                [item]: { count: newCount, avg: newAvg }
+            }
         };
-      });
-    } else { 
-        // Optional: reduce log spam if holding button
-        // setLog(prev => ["Not enough gold!", ...prev]); 
-    }
+    });
   };
 
   const sellItem = (item) => {
-    if (inventory[item].count > 0) {
-      const value = Math.floor(currentPrices[item] * priceMod); 
-      setMoney(money + value);
-      
-      setInventory(prev => ({
-        ...prev,
-        [item]: { ...prev[item], count: prev[item].count - 1 }
-      }));
-      // Optional: Reduce log spam
-    }
+    setResources(prev => {
+        const currentInv = prev.inventory;
+        if (currentInv[item].count <= 0) return prev; // Fail check
+
+        const value = Math.floor(currentPrices[item] * priceMod); 
+        
+        return {
+            money: prev.money + value,
+            inventory: {
+                ...currentInv,
+                [item]: { ...currentInv[item], count: currentInv[item].count - 1 }
+            }
+        };
+    });
   };
-  
-    const sellAll = (item) => {
-    const count = inventory[item].count;
-    if (count > 0) {
+
+  const sellAll = (item) => {
+    setResources(prev => {
+        const currentInv = prev.inventory;
+        const count = currentInv[item].count;
+        if (count <= 0) return prev;
+
         const value = Math.floor(currentPrices[item] * priceMod);
         const totalSale = value * count;
+
+        // Optional: We can log here, but React state setters should be pure. 
+        // Ideally, log outside, but for this simple app, logging the action separately is fine.
         
-        setMoney(prev => prev + totalSale);
-        setInventory(prev => ({
-            ...prev,
-            [item]: { count: 0, avg: 0 } // Reset to 0
-        }));
-        setLog(prev => [`Sold all ${item} for ${totalSale}g`, ...prev]);
-    }
+        return {
+            money: prev.money + totalSale,
+            inventory: {
+                ...currentInv,
+                [item]: { count: 0, avg: 0 }
+            }
+        };
+    });
   };
 
   // 3. THEME: Buy Upgrades
-  const buyUpgrade = (upgrade) => {
+const buyUpgrade = (upgrade) => {
+    // Check against 'money' (which is destructured from resources at the top of component)
     if (money < upgrade.cost) return setLog(prev => ["Too expensive!", ...prev]);
     if (playerItems.find(i => i.id === upgrade.id)) return setLog(prev => ["Already own that!", ...prev]);
 
-    setMoney(m => m - upgrade.cost);
+    // UPDATE: Use setResources to deduct money
+    setResources(prev => ({ ...prev, money: prev.money - upgrade.cost }));
+    
     setPlayerItems([...playerItems, upgrade]);
     
     if (upgrade.type === 'inventory') setMaxInventory(m => m + upgrade.value);
@@ -353,20 +436,28 @@ const startGame = () => {
   };
 
   const payDebt = () => {
-    if (money > 0 && debt > 0) {
-      const amount = Math.min(money, debt);
-      setMoney(money - amount);
-      setDebt(debt - amount);
-      setLog(prev => [`Paid ${amount}g loan.`, ...prev]);
-    }
+    // We use setResources as the source of truth for the transaction
+    setResources(prev => {
+        // Validation inside the setter ensures we don't pay with money we don't have
+        if (prev.money <= 0 || debt <= 0) return prev;
+
+        const amount = Math.min(prev.money, debt);
+        
+        // Side Effect: Update Debt (Since Debt is its own state, this is safe to do here)
+        setDebt(d => d - amount);
+        
+        setLog(logPrev => [`Paid ${amount}g loan.`, ...logPrev]);
+
+        // Return new money state
+        return { ...prev, money: prev.money - amount };
+    });
   };
 
   const travel = () => {
     if (day >= MAX_DAYS) return triggerGameOver();
     setDay(day + 1);
-    if (debt > 0) { setDebt(d => d + Math.ceil(debt * 0.05)); }  // 5% Interest
+    if (debt > 0) { setDebt(d => d + Math.ceil(debt * 0.05)); }
     
-    // Pick new location that isn't current one
     let nextLoc;
     do {
         nextLoc = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
@@ -520,69 +611,19 @@ const startGame = () => {
       <div className="mb-4">
         <h2 className="text-xs font-bold mb-2 text-slate-500 uppercase tracking-widest">Marketplace</h2>
         <div className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
-            {Object.keys(currentPrices).map((item) => {
-                const currentPrice = Math.ceil(currentPrices[item] * priceMod);
-                const myAvg = inventory[item]?.avg || 0;
-                const haveStock = inventory[item]?.count > 0;
-                
-                // Determine Profit Color
-                let priceColor = "text-yellow-500";
-                if (haveStock) {
-                    if (currentPrice > myAvg) priceColor = "text-green-400"; // Profit
-                    if (currentPrice < myAvg) priceColor = "text-red-400";   // Loss
-                }
-
-                // Setup Long Press
-                const buyEvents = useLongPress(() => buyItem(item));
-                const sellEvents = useLongPress(() => sellItem(item));
-
-                return (
-                    <div key={item} className="flex justify-between items-center p-3 border-b border-slate-700 last:border-0">
-                        <div className="w-1/3">
-                            <div className="font-bold text-slate-300 flex items-center gap-2 capitalize">
-                                {getIcon(item)} {item}
-                            </div>
-                            {/* Show Average Cost if we own some */}
-                            {haveStock && (
-                                <div className="text-[10px] text-slate-500">
-                                    Avg: {Math.floor(myAvg)}g
-                                </div>
-                            )}
-                        </div>
-                        
-                        <div className={`w-1/3 text-center font-mono ${priceColor}`}>
-                            {currentPrice} g
-                        </div>
-                        
-                        <div className="w-1/3 flex justify-end gap-1">
-                            {/* Buy Button (Holdable) */}
-                            <button 
-                                {...buyEvents}
-                                className="bg-green-700 hover:bg-green-600 px-3 py-2 rounded text-xs font-bold active:scale-95 transition-transform"
-                            >
-                                Buy
-                            </button>
-
-                            {/* Sell Button (Holdable) */}
-                            <button 
-                                {...sellEvents}
-                                className="bg-red-700 hover:bg-red-600 px-3 py-2 rounded text-xs font-bold active:scale-95 transition-transform"
-                            >
-                                Sell
-                            </button>
-                            
-                            {/* Sell All Button (Click only) */}
-                            <button 
-                                onClick={() => sellAll(item)}
-                                className="bg-slate-700 hover:bg-slate-600 px-2 py-2 rounded text-xs font-bold border border-slate-600"
-                                title="Sell All"
-                            >
-                                All
-                            </button>
-                        </div>
-                    </div>
-                );
-            })}
+            {Object.keys(currentPrices).map((item) => (
+                <MarketItem 
+                    key={item}
+                    item={item}
+                    icon={getIcon(item)}
+                    price={Math.ceil(currentPrices[item] * priceMod)}
+                    myAvg={inventory[item]?.avg || 0}
+                    haveStock={inventory[item]?.count > 0}
+                    onBuy={() => buyItem(item)}
+                    onSell={() => sellItem(item)}
+                    onSellAll={() => sellAll(item)}
+                />
+            ))}
         </div>
       </div>
 
