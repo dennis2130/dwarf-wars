@@ -90,22 +90,34 @@ export const EVENTS = [
 
 import filter from 'leo-profanity';
 
-// 1. Force it to load the English dictionary
-// (If this still causes issues, we will add a manual list)
-filter.loadDictionary('en'); 
+// 1. Initialize Base Dictionary
+filter.loadDictionary('en');
+
+// 2. Custom Strict List (Add words here that you find slipping through)
+// The library misses some compound words or specific slang.
+const STRICT_BAN_LIST = [
+    'shithead', 'dumbass', 'jackass', 'kickass', 
+    'scumbag', 'douchebag', 'asshole'
+    // Add more here as you find them
+];
 
 export const validateName = (name) => {
     if (!name) return "Name is required.";
-    if (name.length > 15) return "Name is too long (Max 15 chars).";
+    if (name.length > 30) return "Name is too long (Max 30 chars).";
     
-    // 2. Clean the input (remove spaces/numbers to catch "b a d w o r d" or "b4dword")
-    // This makes the filter much stricter
-    const cleanName = name.replace(/[^a-zA-Z]/g, ""); 
+    // Normalize: lowercase
+    const lowerName = name.toLowerCase();
+    
+    // Check 1: Library Filter (Standard stuff)
+    if (filter.check(name)) return "That name is not allowed.";
 
-    // 3. Check both the raw name AND the cleaned name
-    if (filter.check(name) || filter.check(cleanName)) {
-        return "That name is not allowed.";
+    // Check 2: Strict List (Manual overrides)
+    // We check if the name *contains* any of these words
+    for (const badWord of STRICT_BAN_LIST) {
+        if (lowerName.includes(badWord)) {
+            return "That name is not allowed.";
+        }
     }
-    
+
     return null; 
 };
