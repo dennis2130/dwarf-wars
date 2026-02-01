@@ -33,7 +33,7 @@
  * - Game over screen (final score, restart)
  */
 import { useState, useEffect } from 'react'
-import { RACES, CLASSES, EVENTS, LOCATIONS, UPGRADES, BASE_PRICES } from './gameData' 
+import { RACES, CLASSES, EVENTS, LOCATIONS, UPGRADES, BASE_PRICES, validateName } from './gameData'
 import { supabase } from './supabaseClient'
 // 1. VISUALS: Import Icons
 import { Coins, Skull, Heart, Shield, ShoppingBag, Map, Gem, UtensilsCrossed, FlaskConical, Sword, RotateCcw, LogOut } from 'lucide-react'
@@ -176,8 +176,25 @@ function App() {
 
   // --- DB FUNCTIONS ---
   const fetchLeaderboard = async () => {
-    const { data } = await supabase.from('high_scores').select('*').order('final_score', { ascending: false }).limit(5);
-    if (data) setLeaderboard(data);
+    const { data } = await supabase
+      .from('high_scores')
+      .select('*')
+      .order('final_score', { ascending: false })
+      .limit(10); // Increased to 10 so you can see more
+
+    if (data) {
+        // Sanitize the data before setting state
+        const cleanLeaderboard = data.map(entry => {
+            // If validateName returns an error string (meaning it's invalid/profane)
+            // We replace the name for the display
+            const error = validateName(entry.player_name);
+            if (error) {
+                return { ...entry, player_name: "Banned Goblin" }; // Thematic Redaction
+            }
+            return entry;
+        });
+        setLeaderboard(cleanLeaderboard);
+    }
   };
 
   const fetchSavedCharacters = async () => {
@@ -187,10 +204,23 @@ function App() {
 
   const saveNewCharacter = async () => {
     if (!session) return;
+    
+    // Validate Name again (Security best practice)
+    const nameError = validateName(player.name);
+    if (nameError) return alert(nameError);
+
     const { error } = await supabase.from('saved_characters').insert([
-      { user_id: session.user.id, name: player.name, race_id: player.race.id, class_id: player.class.id }
+      { 
+        user_id: session.user.id,
+        name: player.name, // The filter will ensure this is clean
+        race_id: player.race.id,
+        class_id: player.class.id
+      }
     ]);
-    if (!error) { alert("Character Saved!"); fetchSavedCharacters(); }
+    if (!error) {
+        alert("Character Saved!");
+        fetchSavedCharacters();
+    }
   };
 
   const deleteCharacter = async (e, id) => {
@@ -222,6 +252,10 @@ function App() {
   };
 
   const startGame = () => {
+
+    const nameError = validateName(player.name);
+    if (nameError) return alert(nameError);
+
     if(!player.name || !player.race || !player.class) return alert("Complete your character!");
 
     let inv = 50 + player.race.stats.inventory;

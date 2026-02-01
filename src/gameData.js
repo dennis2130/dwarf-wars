@@ -87,3 +87,25 @@ export const EVENTS = [
   { id: 'sale',   text: "Market Crash!", type: 'price', value: 0.5 },
   { id: 'riot',   text: "Riots! Prices high.", type: 'price', value: 2.0 }
 ];
+
+import filter from 'leo-profanity';
+
+// 1. Force it to load the English dictionary
+// (If this still causes issues, we will add a manual list)
+filter.loadDictionary('en'); 
+
+export const validateName = (name) => {
+    if (!name) return "Name is required.";
+    if (name.length > 15) return "Name is too long (Max 15 chars).";
+    
+    // 2. Clean the input (remove spaces/numbers to catch "b a d w o r d" or "b4dword")
+    // This makes the filter much stricter
+    const cleanName = name.replace(/[^a-zA-Z]/g, ""); 
+
+    // 3. Check both the raw name AND the cleaned name
+    if (filter.check(name) || filter.check(cleanName)) {
+        return "That name is not allowed.";
+    }
+    
+    return null; 
+};
