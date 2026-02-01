@@ -37,6 +37,32 @@ import { RACES, CLASSES, EVENTS, LOCATIONS, UPGRADES, BASE_PRICES } from './game
 import { supabase } from './supabaseClient'
 // 1. VISUALS: Import Icons
 import { Coins, Skull, Heart, Shield, ShoppingBag, Map, Gem, UtensilsCrossed, FlaskConical, Sword, RotateCcw, LogOut } from 'lucide-react'
+import { useRef } from 'react';
+
+function useLongPress(callback, ms = 100) {
+  const timerRef = useRef(null);
+
+  const start = () => {
+    if (timerRef.current) return;
+    callback(); // Fire once immediately
+    timerRef.current = setInterval(callback, ms);
+  };
+
+  const stop = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  return {
+    onMouseDown: start,
+    onMouseUp: stop,
+    onMouseLeave: stop,
+    onTouchStart: start,
+    onTouchEnd: stop,
+  };
+}
 
 function App() {
   // --- AUTH STATE ---
@@ -146,7 +172,7 @@ function App() {
 const startGame = () => {
     if(!player.name || !player.race || !player.class) return alert("Complete your character!");
 
-    let inv = 20 + player.race.stats.inventory;
+    let inv = 50 + player.race.stats.inventory;
     let hp = 100 + player.race.stats.health;
     let pm = 1.0 - player.race.stats.haggle;
     let def = 0;
@@ -164,7 +190,9 @@ const startGame = () => {
     setPlayerItems([]);
     setDay(1);
     const initialInv = {};
-    Object.keys(BASE_PRICES).forEach(key => initialInv[key] = 0);
+    Object.keys(BASE_PRICES).forEach(key => {
+        initialInv[key] = { count: 0, avg: 0 };
+    });
     setInventory(initialInv);
     
     // RESET LOCATION & PRICES
@@ -200,7 +228,7 @@ const startGame = () => {
     let newPrices = { ...BASE_PRICES };
     for (const item in newPrices) {
         // Base * Volatility * Location Modifier * Event Modifier
-        const volatility = Math.random() * 0.4 + 0.8; // 0.8 to 1.2
+        const volatility = Math.random() * 2 + 0.25; // Updated Volatility: 0.25 to 2.25
         const locMod = locObj.prices[item] || 1.0; 
         newPrices[item] = Math.floor(BASE_PRICES[item] * volatility * locMod * randomEventMod);
     }
@@ -255,21 +283,58 @@ const startGame = () => {
 
   const buyItem = (item) => {
     const cost = Math.ceil(currentPrices[item] * priceMod); 
-    const totalItems = Object.values(inventory).reduce((a, b) => a + b, 0);
+    
+    // Calculate total count based on the new object structure
+    const totalItems = Object.values(inventory).reduce((a, b) => a + b.count, 0);
+    
     if (totalItems >= maxInventory) return setLog(prev => ["Inventory full!", ...prev]);
+    
     if (money >= cost) {
       setMoney(money - cost);
-      setInventory({ ...inventory, [item]: inventory[item] + 1 }); 
-      setLog(prev => [`Bought ${item} for ${cost}g`, ...prev]);
-    } else { setLog(prev => ["Not enough gold!", ...prev]); }
+      
+      setInventory(prev => {
+        const current = prev[item];
+        // Calculate Weighted Average: (OldTotalCost + NewCost) / NewCount
+        const totalValue = (current.count * current.avg) + cost;
+        const newCount = current.count + 1;
+        const newAvg = totalValue / newCount;
+
+        return {
+            ...prev,
+            [item]: { count: newCount, avg: newAvg }
+        };
+      });
+    } else { 
+        // Optional: reduce log spam if holding button
+        // setLog(prev => ["Not enough gold!", ...prev]); 
+    }
   };
 
   const sellItem = (item) => {
-    if (inventory[item] > 0) {
+    if (inventory[item].count > 0) {
       const value = Math.floor(currentPrices[item] * priceMod); 
       setMoney(money + value);
-      setInventory({ ...inventory, [item]: inventory[item] - 1 });
-      setLog(prev => [`Sold ${item} for ${value}g`, ...prev]);
+      
+      setInventory(prev => ({
+        ...prev,
+        [item]: { ...prev[item], count: prev[item].count - 1 }
+      }));
+      // Optional: Reduce log spam
+    }
+  };
+  
+    const sellAll = (item) => {
+    const count = inventory[item].count;
+    if (count > 0) {
+        const value = Math.floor(currentPrices[item] * priceMod);
+        const totalSale = value * count;
+        
+        setMoney(prev => prev + totalSale);
+        setInventory(prev => ({
+            ...prev,
+            [item]: { count: 0, avg: 0 } // Reset to 0
+        }));
+        setLog(prev => [`Sold all ${item} for ${totalSale}g`, ...prev]);
     }
   };
 
@@ -299,7 +364,7 @@ const startGame = () => {
   const travel = () => {
     if (day >= MAX_DAYS) return triggerGameOver();
     setDay(day + 1);
-    if (debt > 0) { setDebt(d => d + Math.ceil(debt * 0.10)); }
+    if (debt > 0) { setDebt(d => d + Math.ceil(debt * 0.05)); }  // 5% Interest
     
     // Pick new location that isn't current one
     let nextLoc;
@@ -451,35 +516,97 @@ const startGame = () => {
 
       {activeTab === 'market' ? (
         <>
-            <div className="mb-4">
-                <div className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
-                    {Object.keys(currentPrices).map((item) => (
-                        <div key={item} className="flex justify-between items-center p-3 border-b border-slate-700 last:border-0">
-                            <div className="w-1/3 font-bold text-slate-300 flex items-center gap-2 capitalize">{getIcon(item)} {item}</div>
-                            <div className="w-1/3 text-center text-yellow-500 font-mono">{Math.ceil(currentPrices[item] * priceMod)} g</div>
-                            <div className="w-1/3 flex justify-end gap-2">
-                                <button onClick={() => buyItem(item)} className="bg-green-700 hover:bg-green-600 px-2 py-1 rounded text-xs font-bold">Buy</button>
-                                <button onClick={() => sellItem(item)} className="bg-red-700 hover:bg-red-600 px-2 py-1 rounded text-xs font-bold">Sell</button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
+      {/* MARKETPLACE */}
+      <div className="mb-4">
+        <h2 className="text-xs font-bold mb-2 text-slate-500 uppercase tracking-widest">Marketplace</h2>
+        <div className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+            {Object.keys(currentPrices).map((item) => {
+                const currentPrice = Math.ceil(currentPrices[item] * priceMod);
+                const myAvg = inventory[item]?.avg || 0;
+                const haveStock = inventory[item]?.count > 0;
+                
+                // Determine Profit Color
+                let priceColor = "text-yellow-500";
+                if (haveStock) {
+                    if (currentPrice > myAvg) priceColor = "text-green-400"; // Profit
+                    if (currentPrice < myAvg) priceColor = "text-red-400";   // Loss
+                }
 
-            <div className="mb-4 flex-grow">
-                <div className="flex justify-between items-end mb-2">
-                    <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Inventory</h2>
-                    <span className="text-xs text-slate-400">{Object.values(inventory).reduce((a, b) => a + b, 0)} / {maxInventory} Slots</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-sm text-center">
-                    {Object.entries(inventory).map(([key, count]) => (
-                        <div key={key} className="bg-slate-800 p-2 rounded border border-slate-700">
-                            <div className="text-slate-400 text-xs mb-1 capitalize flex justify-center">{getIcon(key)}</div>
-                            <div className="text-white font-bold text-lg">{count}</div>
+                // Setup Long Press
+                const buyEvents = useLongPress(() => buyItem(item));
+                const sellEvents = useLongPress(() => sellItem(item));
+
+                return (
+                    <div key={item} className="flex justify-between items-center p-3 border-b border-slate-700 last:border-0">
+                        <div className="w-1/3">
+                            <div className="font-bold text-slate-300 flex items-center gap-2 capitalize">
+                                {getIcon(item)} {item}
+                            </div>
+                            {/* Show Average Cost if we own some */}
+                            {haveStock && (
+                                <div className="text-[10px] text-slate-500">
+                                    Avg: {Math.floor(myAvg)}g
+                                </div>
+                            )}
                         </div>
-                    ))}
+                        
+                        <div className={`w-1/3 text-center font-mono ${priceColor}`}>
+                            {currentPrice} g
+                        </div>
+                        
+                        <div className="w-1/3 flex justify-end gap-1">
+                            {/* Buy Button (Holdable) */}
+                            <button 
+                                {...buyEvents}
+                                className="bg-green-700 hover:bg-green-600 px-3 py-2 rounded text-xs font-bold active:scale-95 transition-transform"
+                            >
+                                Buy
+                            </button>
+
+                            {/* Sell Button (Holdable) */}
+                            <button 
+                                {...sellEvents}
+                                className="bg-red-700 hover:bg-red-600 px-3 py-2 rounded text-xs font-bold active:scale-95 transition-transform"
+                            >
+                                Sell
+                            </button>
+                            
+                            {/* Sell All Button (Click only) */}
+                            <button 
+                                onClick={() => sellAll(item)}
+                                className="bg-slate-700 hover:bg-slate-600 px-2 py-2 rounded text-xs font-bold border border-slate-600"
+                                title="Sell All"
+                            >
+                                All
+                            </button>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+      </div>
+
+      {/* INVENTORY */}
+      <div className="mb-4 flex-grow">
+        <div className="flex justify-between items-end mb-2">
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Inventory</h2>
+            <span className="text-xs text-slate-400">
+                {Object.values(inventory).reduce((a, b) => a + b.count, 0)} / {maxInventory} Slots
+            </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-sm text-center">
+            {Object.entries(inventory).map(([key, data]) => (
+                <div key={key} className={`p-2 rounded border border-slate-700 ${data.count > 0 ? 'bg-slate-800' : 'bg-slate-900 opacity-50'}`}>
+                    <div className="text-slate-400 text-xs mb-1 capitalize flex justify-center">
+                        {getIcon(key)}
+                    </div>
+                    <div className="text-white font-bold text-lg">
+                        {data.count}
+                    </div>
                 </div>
-            </div>
+            ))}
+        </div>
+      </div>
         </>
       ) : (
         <div className="mb-4 flex-grow">

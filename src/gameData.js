@@ -2,22 +2,22 @@ export const RACES = [
     { 
       id: 'human', name: 'Human', desc: 'Versatile.',
       bonus: 'Inventory +20', // Buffed
-      stats: { inventory: 20, health: 0, haggle: 0 } 
+      stats: { inventory: 10, health: 0, haggle: 0 } 
     },
     { 
       id: 'dwarf', name: 'Dwarf', desc: 'Greedy.',
       bonus: 'Health +40',
-      stats: { inventory: 0, health: 40, haggle: 0 } 
+      stats: { inventory: 0, health: 40, haggle: 0 } // Buffed
     },
     { 
       id: 'elf', name: 'Elf', desc: 'Charismatic.',
       bonus: 'Better Prices (15%)', // Buffed
-      stats: { inventory: 5, health: -10, haggle: 0.15 } 
+      stats: { inventory: 10, health: -10, haggle: 0.15 } 
     },
     { 
       id: 'orc', name: 'Orc', desc: 'Strong.',
-      bonus: 'Huge Inventory (+40)', // Buffed
-      stats: { inventory: 40, health: 20, haggle: -0.15 } 
+      bonus: 'Huge Inventory (+20)', // Buffed
+      stats: { inventory: 20, health: 20, haggle: -0.15 } 
     }
 ];
   
