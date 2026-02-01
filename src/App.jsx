@@ -203,8 +203,12 @@ function App() {
   const saveScore = async () => {
     setIsSaving(true);
     await supabase.from('high_scores').insert([{
-        player_name: player.name, race: player.race.name, class: player.class.name,
-        gold: money, debt: debt, final_score: money - debt
+        player_name: player.name,
+        race: player.race.name,
+        class: player.class.name,
+        gold: resources.money,       // UPDATED: was 'money'
+        debt: debt,
+        final_score: resources.money - debt // UPDATED: was 'money - debt'
     }]);
     setIsSaving(false);
     fetchLeaderboard();
@@ -522,6 +526,27 @@ const buyUpgrade = (upgrade) => {
                 </div>
             </div>
         )}
+
+        {/* LEADERBOARD */}
+        <div className="mb-8 bg-black/30 rounded-lg p-4 border border-slate-800">
+            <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 tracking-widest">Global Leaders</h3>
+            {leaderboard.length === 0 ? (
+                <div className="text-xs text-slate-600 italic">No high scores yet...</div>
+            ) : (
+                leaderboard.map((score, i) => (
+                    <div key={i} className="flex justify-between text-sm items-center mb-1 border-b border-slate-800/50 pb-1 last:border-0">
+                        <span className="text-slate-400 flex gap-2">
+                            <span className="text-slate-600 font-mono w-4">{i+1}.</span> 
+                            {score.player_name} 
+                            <span className="text-slate-600 text-[10px] hidden sm:inline">({score.race} {score.class})</span>
+                        </span>
+                        <span className={`font-mono ${score.final_score > 0 ? "text-green-500" : "text-red-500"}`}>
+                            {score.final_score.toLocaleString()}
+                        </span>
+                    </div>
+                ))
+            )}
+        </div>
         
         {/* CREATE CHARACTER */}
         <div className="space-y-4">
