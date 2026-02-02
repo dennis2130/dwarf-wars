@@ -1,8 +1,8 @@
 export const RACES = [
     { 
       id: 'human', name: 'Human', desc: 'Versatile.',
-      bonus: 'Inventory +20', // Buffed
-      stats: { inventory: 10, health: 0, haggle: 0 } 
+      bonus: 'Inventory +10, Health +10', // Buffed
+      stats: { inventory: 10, health: 10, haggle: 0 } 
     },
     { 
       id: 'dwarf', name: 'Dwarf', desc: 'Greedy.',
