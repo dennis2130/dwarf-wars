@@ -619,7 +619,7 @@ const buyUpgrade = (upgrade) => {
 
   // --- RENDER: MAIN GAME (PLAYING) ---
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-200 font-sans p-4 max-w-md mx-auto border-x border-slate-700 flex flex-col">
+    <div className="min-h-screen bg-slate-900 text-slate-200 font-sans p-2 max-w-md mx-auto border-x border-slate-700 flex flex-col">
     <header className="flex justify-between items-start mb-4 border-b border-slate-700 pb-2">
         <div>
             <h1 className="text-xl font-bold text-yellow-500">{player.name}</h1>
@@ -716,20 +716,23 @@ const buyUpgrade = (upgrade) => {
       </div>
 
       {/* INVENTORY */}
-      <div className="mb-4 flex-grow">
-        <div className="flex justify-between items-end mb-2">
-            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Inventory</h2>
-            <span className="text-xs text-slate-400">
-                {Object.values(inventory).reduce((a, b) => a + b.count, 0)} / {maxInventory} Slots
+      <div className="mb-2 flex-grow">
+        <div className="flex justify-between items-end mb-1">
+            <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Inventory</h2>
+            <span className="text-[10px] text-slate-400">
+                {Object.values(inventory).reduce((a, b) => a + b.count, 0)} / {maxInventory}
             </span>
         </div>
-        <div className="grid grid-cols-3 gap-2 text-sm text-center">
+        
+        {/* COMPACT GRID: 4 Columns, Tighter Spacing */}
+        <div className="grid grid-cols-4 gap-1 text-center">
             {Object.entries(inventory).map(([key, data]) => (
-                <div key={key} className={`p-2 rounded border border-slate-700 ${data.count > 0 ? 'bg-slate-800' : 'bg-slate-900 opacity-50'}`}>
-                    <div className="text-slate-400 text-xs mb-1 capitalize flex justify-center">
+                <div key={key} className={`p-1 rounded border border-slate-700 flex flex-col items-center justify-center ${data.count > 0 ? 'bg-slate-800' : 'bg-slate-900 opacity-40'}`}>
+                    <div className="text-slate-400 mb-0.5">
                         {getIcon(key)}
                     </div>
-                    <div className="text-white font-bold text-lg">
+                    {/* Smaller, bolder number */}
+                    <div className="text-white font-bold text-sm leading-none">
                         {data.count}
                     </div>
                 </div>
