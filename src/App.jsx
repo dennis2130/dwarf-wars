@@ -116,6 +116,7 @@ function App() {
 
   // --- APP STATE ---
   const [gameState, setGameState] = useState('start'); 
+  const [showHelp, setShowHelp] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('market'); // 'market' or 'equipment'
@@ -612,6 +613,65 @@ const buyUpgrade = (upgrade) => {
             <button onClick={startGame} disabled={!player.name || !player.race || !player.class} className="flex-1 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-500 hover:to-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-lg shadow-lg text-lg transition-all">PLAY</button>
             {session && player.name && player.race && player.class && (<button onClick={saveNewCharacter} className="bg-slate-700 text-white px-4 rounded-lg border border-slate-600 hover:bg-slate-600">Save</button>)}
           </div>
+          {/* HELP TOGGLE */}
+        <div className="mt-6 text-center">
+            <button 
+                onClick={() => setShowHelp(!showHelp)} 
+                className="text-xs text-slate-500 hover:text-yellow-500 underline transition-colors"
+            >
+                {showHelp ? "Hide Guide" : "Read Lore & Rules"}
+            </button>
+        </div>
+
+        {/* HELP CONTENT (Collapsible) */}
+        {showHelp && (
+            <div className="mt-4 bg-black/40 rounded-lg p-4 border border-slate-800 text-sm animate-in fade-in slide-in-from-top-4 duration-300">
+                
+                {/* LORE */}
+                <div className="mb-6">
+                    <h3 className="text-yellow-500 font-bold uppercase tracking-widest mb-2 border-b border-slate-800 pb-1">The Iron Bank Calls</h3>
+                    <p className="text-slate-400 text-xs leading-relaxed italic">
+                        "The Realm is in chaos. Dragons burn the skies, goblins run the slums, and inflation is rampant. 
+                        You have <strong>31 Days</strong> to turn your measly pocket change into a fortune."
+                    </p>
+                    <p className="text-slate-400 text-xs leading-relaxed mt-2">
+                        Travel between cities, buy low, sell high, and manage your inventory. 
+                        But beware—the Loan Shark charges <strong>5% daily interest</strong>. 
+                        Pay him back, or face the consequences.
+                    </p>
+                </div>
+
+                {/* RACES */}
+                <div className="mb-6">
+                    <h3 className="text-blue-400 font-bold uppercase tracking-widest mb-2 border-b border-slate-800 pb-1">Races</h3>
+                    <div className="space-y-3">
+                        {RACES.map(r => (
+                            <div key={r.id} className="flex flex-col">
+                                <span className="font-bold text-slate-200">{r.name}</span>
+                                <span className="text-[10px] text-slate-500 italic">{r.desc}</span>
+                                <span className="text-[10px] text-green-400">Bonus: {r.bonus}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* CLASSES */}
+                <div>
+                    <h3 className="text-red-400 font-bold uppercase tracking-widest mb-2 border-b border-slate-800 pb-1">Classes</h3>
+                    <div className="space-y-3">
+                        {CLASSES.map(c => (
+                            <div key={c.id} className="flex flex-col">
+                                <span className="font-bold text-slate-200">{c.name}</span>
+                                <span className="text-[10px] text-slate-500 italic">{c.desc}</span>
+                                <span className="text-[10px] text-green-400">
+                                    Start: {c.startingMoney}g / Debt: {c.startingDebt}g
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        )}
         </div>
       </div>
     );

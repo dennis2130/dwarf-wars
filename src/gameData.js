@@ -34,8 +34,8 @@ export const CLASSES = [
     },
     { 
       id: 'warrior', name: 'Warrior', desc: 'Fighter.',
-      startingMoney: 300, 
-      startingDebt: 5000
+      startingMoney: 600, 
+      startingDebt: 3000
     }
 ];
 
