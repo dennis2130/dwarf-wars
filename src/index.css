@@ -3,5 +3,31 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-900; /* Matches the game background */
+  /* 1. Base color (matches your map's "paper" color) */
+  @apply bg-slate-900;
+
+  /* 2. The Image */
+  background-image: url('/map-bg.jpg');
+
+  /* 3. Positioning: Keep it centered so the "Castle" is likely visible */
+  background-position: center center;
+
+  /* 4. Sizing: "cover" scales the image to ensure no white space is visible.
+     On a phone, it will crop the sides. On a desktop, it will crop top/bottom.
+     This is standard for wallpapers. */
+  background-size: cover;
+
+  /* 5. Locking: This stops the map from scrolling when you scroll the log */
+  background-attachment: fixed;
+}
+
+/* 
+   READABILITY FIX:
+   Since the map has gold lines, it might make text hard to read.
+   This adds a dark tint over the map, but keeps the gold visible.
+   We attach this to the #root (the app wrapper).
+*/
+#root {
+  min-height: 100vh;
+  background-color: rgba(15, 23, 42, 0.85); /* 85% opacity Slate-900 */
 }
