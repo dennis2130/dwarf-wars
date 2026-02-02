@@ -119,6 +119,7 @@ function App() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('market'); // 'market' or 'equipment'
+  const [flash, setFlash] = useState(''); // 'red', 'green', 'gold'
   
   // --- PLAYER STATE ---
   const [player, setPlayer] = useState({ name: '', race: null, class: null });
@@ -342,6 +343,8 @@ function App() {
 
     switch(event.type) {
         case 'damage':
+            setFlash('red'); // Add this
+            setTimeout(() => setFlash(''), 300);
             const dmg = Math.max(0, event.value - defense);
             setHealth(h => {
                 const newH = h - dmg;
@@ -356,6 +359,8 @@ function App() {
             break;
         case 'money': 
             // UPDATE: Use the new helper
+            setFlash('gold');
+            setTimeout(() => setFlash(''), 300);
             updateMoney(event.value); 
             msg += ` (+${event.value} G)`; 
             break;
@@ -586,7 +591,7 @@ const buyUpgrade = (upgrade) => {
         <div className="space-y-4">
           <div>
             <label className="block text-xs text-slate-500 uppercase mb-1">Name</label>
-            <input type="text" value={player.name} className="w-full bg-slate-800 border border-slate-700 rounded p-3 text-white outline-none focus:border-yellow-500" placeholder="Enter hero name..." onChange={(e) => setPlayer({...player, name: e.target.value})} />
+            <input type="text" maxLength={30} value={player.name} className="w-full bg-slate-800 border border-slate-700 rounded p-3 text-white outline-none focus:border-yellow-500" placeholder="Enter hero name..." onChange={(e) => setPlayer({...player, name: e.target.value})} />
           </div>
           <div className="grid grid-cols-2 gap-2">
             {RACES.map(r => (
@@ -615,7 +620,7 @@ const buyUpgrade = (upgrade) => {
   // --- RENDER: MAIN GAME (PLAYING) ---
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 font-sans p-4 max-w-md mx-auto border-x border-slate-700 flex flex-col">
-<header className="flex justify-between items-start mb-4 border-b border-slate-700 pb-2">
+    <header className="flex justify-between items-start mb-4 border-b border-slate-700 pb-2">
         <div>
             <h1 className="text-xl font-bold text-yellow-500">{player.name}</h1>
             <p className="text-xs text-slate-400 capitalize">{player.race?.name} {player.class?.name}</p>
@@ -742,6 +747,14 @@ const buyUpgrade = (upgrade) => {
       <div className="bg-black p-3 rounded-lg h-24 overflow-y-auto text-xs font-mono text-green-500 border border-slate-700 shadow-inner">
         {log.map((entry, i) => <div key={i} className="mb-1 border-b border-gray-900 pb-1 last:border-0"> &gt; {entry}</div>)}
       </div>
+
+      {/* SCREEN FLASH OVERLAY */}
+      <div className={`fixed inset-0 pointer-events-none transition-opacity duration-300 ${
+          flash === 'red' ? 'bg-red-500/30' : 
+          flash === 'gold' ? 'bg-yellow-500/30' : 
+          'opacity-0'
+      }`}></div>
+
     </div>
   )
 }
