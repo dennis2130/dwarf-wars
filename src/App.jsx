@@ -115,6 +115,7 @@ function App() {
   const [savedChars, setSavedChars] = useState([]);
 
   // --- APP STATE ---
+   const [splash, setSplash] = useState(true); // Start true = show splash
   const [gameState, setGameState] = useState('start'); 
   const [showHelp, setShowHelp] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
@@ -390,6 +391,15 @@ function App() {
 const inventoryRef = useRef(inventory);
 useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
 
+  // --- SPLASH SCREEN TIMER ---
+  useEffect(() => {
+    // Wait 2.5 seconds, then hide splash
+    const timer = setTimeout(() => {
+        setSplash(false);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
 const buyItem = (item) => {
     // We calculate cost outside, but everything else happens inside the "Safe Zone"
     const cost = Math.ceil(currentPrices[item] * priceMod); 
@@ -542,6 +552,24 @@ const buyUpgrade = (upgrade) => {
   if (gameState === 'start') {
     return (
       <div className="min-h-screen bg-slate-900 text-slate-200 p-6 max-w-md mx-auto border-x border-slate-700">
+              {/* SPLASH SCREEN */}
+        <div 
+          onClick={() => setSplash(false)} // Allow skipping by click
+          className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900 transition-opacity duration-1000 ${
+              splash ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
+        >
+          <img 
+              src="/logo.png" 
+              alt="Dwarf Wars" 
+              className="w-64 h-auto mb-8 animate-in fade-in zoom-in duration-1000" 
+          />
+          
+          {/* Loading Spinner or "Tap to Start" text */}
+          <div className="text-yellow-500 text-xs tracking-[0.5em] font-bold animate-pulse">
+              LOADING REALM...
+          </div>
+        </div>
         <div className="flex justify-between items-center mb-6">
             <h1 className="text-3xl font-bold text-yellow-500 tracking-tighter flex items-center gap-2"><Shield size={24}/> DWARF WARS</h1>
             {!session ? (
