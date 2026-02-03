@@ -1,0 +1,21 @@
+{
+  "name": "Dwarf Wars",
+  "short_name": "DwarfWars",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    },
+    {
+      "src": "/icon.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    }
+  ]
+}
