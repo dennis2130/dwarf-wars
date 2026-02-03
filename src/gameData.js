@@ -1,25 +1,27 @@
 export const RACES = [
     { 
       id: 'human', name: 'Human', desc: 'Versatile.',
-      bonus: 'Inventory +10, Health +10', // Buffed
-      stats: { inventory: 10, health: 10, haggle: 0 } 
+      bonus: 'Inventory +20',
+      stats: { inventory: 20, health: 0, buyMod: 0, sellMod: 0, combat: 0 } 
     },
     { 
-      id: 'dwarf', name: 'Dwarf', desc: 'Greedy.',
-      bonus: 'Health +40',
-      stats: { inventory: 0, health: 40, haggle: 0 } // Buffed
+      id: 'dwarf', name: 'Dwarf', desc: 'Greedy Negotiator.',
+      bonus: 'Sell for +10% more',
+      stats: { inventory: 0, health: 40, buyMod: 0, sellMod: 0.10, combat: 0 } 
     },
     { 
       id: 'elf', name: 'Elf', desc: 'Charismatic.',
-      bonus: 'Better Prices (15%)', // Buffed
-      stats: { inventory: 10, health: -10, haggle: 0.15 } 
+      bonus: 'Buy for 10% less',
+      stats: { inventory: 5, health: -10, buyMod: 0.10, sellMod: 0, combat: 0 } 
     },
     { 
-      id: 'orc', name: 'Orc', desc: 'Strong.',
-      bonus: 'Huge Inventory (+20)', // Buffed
-      stats: { inventory: 20, health: 20, haggle: -0.15 } 
+      id: 'orc', name: 'Orc', desc: 'Intimidating.',
+      bonus: 'Huge Inventory & Strong',
+      stats: { inventory: 40, health: 20, buyMod: -0.10, sellMod: -0.10, combat: 2 } 
+      // Orcs pay 10% more AND sell for 10% less (people hate them), but +2 Combat
     }
 ];
+
   
 export const CLASSES = [
     { 
@@ -73,10 +75,14 @@ export const LOCATIONS = [
 ];
 
 export const UPGRADES = [
+    // ... Mules/Wagons same as before ...
     { id: 'mule', name: 'Pack Mule', type: 'inventory', value: 20, cost: 1000, desc: "+20 Slots" },
     { id: 'wagon', name: 'Merchant Wagon', type: 'inventory', value: 50, cost: 3000, desc: "+50 Slots" },
-    { id: 'shield', name: 'Wooden Shield', type: 'defense', value: 10, cost: 500, desc: "-10 Dmg" },
-    { id: 'armor', name: 'Mithril Mail', type: 'defense', value: 30, cost: 8000, desc: "-30 Dmg" }
+    
+    // NEW WEAPONS (Combat Bonus instead of flat defense)
+    { id: 'dagger', name: 'Iron Dagger', type: 'combat', value: 2, cost: 500, desc: "+2 Combat Roll" },
+    { id: 'sword', name: 'Steel Sword', type: 'combat', value: 5, cost: 2000, desc: "+5 Combat Roll" },
+    { id: 'axe', name: 'Mithril Axe', type: 'combat', value: 10, cost: 8000, desc: "+10 Combat Roll" }
 ];
 
 export const EVENTS = [

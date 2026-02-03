@@ -77,6 +77,8 @@ function useLongPress(callback, ms = 100) {
     const buyEvents = useLongPress(onBuy);
     const sellEvents = useLongPress(onSell);
 
+
+
     return (
         <div className="flex justify-between items-center p-3 border-b border-slate-700 last:border-0">
             <div className="w-1/3">
@@ -115,13 +117,17 @@ function App() {
   const [savedChars, setSavedChars] = useState([]);
 
   // --- APP STATE ---
-   const [splash, setSplash] = useState(true); // Start true = show splash
+  const [splash, setSplash] = useState(true); // Start true = show splash
   const [gameState, setGameState] = useState('start'); 
   const [showHelp, setShowHelp] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('market'); // 'market' or 'equipment'
   const [flash, setFlash] = useState(''); // 'red', 'green', 'gold'
+
+  // --- COMBAT STATE ---
+  const [combatEvent, setCombatEvent] = useState(null); // { enemy: 'Thief', damage: 30, gold: 500, dc: 12 }
+  const [combatBonus, setCombatBonus] = useState(0);
   
   // --- PLAYER STATE ---
   const [player, setPlayer] = useState({ name: '', race: null, class: null });
@@ -183,7 +189,7 @@ function App() {
       .from('high_scores')
       .select('*')
       .order('final_score', { ascending: false })
-      .limit(10); // Increased to 10 so you can see more
+      .limit(20); // Increased to 10 so you can see more
 
     if (data) {
         // Sanitize the data before setting state
@@ -263,7 +269,6 @@ function App() {
 
     let inv = 50 + player.race.stats.inventory;
     let hp = 100 + player.race.stats.health;
-    let pm = 1.0 - player.race.stats.haggle;
     let def = 0;
     
     if (player.race.id === 'orc') def += 5; 
@@ -283,7 +288,6 @@ function App() {
     setMaxInventory(inv);
     setMaxHealth(hp);
     setHealth(hp);
-    setPriceMod(pm);
     setDefense(def);
     setPlayerItems([]);
     setDay(1);
@@ -333,58 +337,99 @@ function App() {
   };
 
   const triggerRandomEvent = (locObj) => {
-    // Risk based on location
+    // 1. Travel Fatigue (Happens every time)
+    setHealth(h => {
+        const newH = h - 2; 
+        if (newH <= 0) setTimeout(triggerGameOver, 500);
+        return newH;
+    });
+
+    // 2. Risk Check
     if (Math.random() > locObj.risk) { 
         setEventMsg(null); 
         return recalcPrices(locObj); 
     }
 
     const event = EVENTS[Math.floor(Math.random() * EVENTS.length)];
+    
+    // 3. COMBAT EVENTS (Modal)
+    // If we hit this, we set up the fight and STOP (return).
+    if (event.type === 'damage' || event.type === 'theft') {
+        setEventMsg(null); // Clear old simple messages
+        setCombatEvent({
+            name: event.id === 'dragon' ? "Dragon" : "Bandit",
+            text: event.text,
+            // Dragon = hard (DC 18), Bandit = easy (DC 10)
+            damage: event.id === 'dragon' ? 60 : 20,
+            goldLoss: event.type === 'theft' ? 0.25 : 0, 
+            difficulty: event.id === 'dragon' ? 18 : 10 
+        });
+        return recalcPrices(locObj); 
+    }
+
+    // 4. PEACEFUL EVENTS (Auto-Resolve)
+    // We only get here if it wasn't combat.
     let msg = event.text;
     let eventPriceMod = 1.0;
 
     switch(event.type) {
-        case 'damage':
-            setFlash('red'); // Add this
-            setTimeout(() => setFlash(''), 300);
-            const dmg = Math.max(0, event.value - defense);
-            setHealth(h => {
-                const newH = h - dmg;
-                if (newH <= 0) setTimeout(triggerGameOver, 500);
-                return newH;
-            });
-            msg += ` (-${dmg} HP)`;
-            break;
         case 'heal': 
             setHealth(h => Math.min(h + event.value, maxHealth)); 
             msg += ` (+${event.value} HP)`; 
             break;
         case 'money': 
-            // UPDATE: Use the new helper
-            setFlash('gold');
-            setTimeout(() => setFlash(''), 300);
             updateMoney(event.value); 
             msg += ` (+${event.value} G)`; 
-            break;
-        case 'theft': 
-            // UPDATE: Calculate theft based on current money
-            // We use a functional update here to ensure we steal from the *real* current amount
-            setResources(prev => {
-                const lost = Math.floor(prev.money * event.value);
-                // We have to modify the message "later" or just accept a generic message
-                // For simplicity, let's just log the generic message here
-                return { ...prev, money: prev.money - lost };
-            });
-            msg += ` (Thieves struck!)`; 
             break;
         case 'price': 
             eventPriceMod = event.value;
             break;
+        // Note: 'damage' and 'theft' are removed from here because the IF block caught them
         default: break;
     }
+
+    // Visuals for peaceful events
+    if (event.type === 'money') {
+        setFlash('green');
+        setTimeout(() => setFlash(''), 300); // Add this line
+    }
+    
     setEventMsg({ text: msg, type: event.type });
     setLog(prev => [msg, ...prev]);
     return recalcPrices(locObj, eventPriceMod);
+  };
+
+    const resolveCombat = (choice) => {
+    if (!combatEvent) return;
+
+    if (choice === 'pay') {
+        if (combatEvent.goldLoss > 0) {
+            setResources(prev => ({...prev, money: Math.floor(prev.money * (1 - combatEvent.goldLoss))}));
+            setLog(prev => [`You paid off the ${combatEvent.name}.`, ...prev]);
+        } else {
+            // If it's a dragon, you can't pay it off, you take damage trying to run
+            setHealth(h => h - (combatEvent.damage / 2));
+            setLog(prev => [`You ran from the ${combatEvent.name} but got scorched.`, ...prev]);
+        }
+    } 
+    else if (choice === 'fight') {
+        // D20 Roll
+        const d20 = Math.ceil(Math.random() * 20);
+        const total = d20 + combatBonus + (player.race.stats.combat || 0);
+        
+        if (total >= combatEvent.difficulty) {
+            setLog(prev => [`VICTORY! Rolled ${total} (DC ${combatEvent.difficulty}). Killed ${combatEvent.name}.`, ...prev]);
+            // Optional: Loot reward?
+        } else {
+            setHealth(h => h - combatEvent.damage);
+            setLog(prev => [`DEFEAT! Rolled ${total} (DC ${combatEvent.difficulty}). Took ${combatEvent.damage} dmg.`, ...prev]);
+            if (combatEvent.goldLoss > 0) {
+                 setResources(prev => ({...prev, money: Math.floor(prev.money * (1 - combatEvent.goldLoss))}));
+            }
+        }
+    }
+    
+    setCombatEvent(null); // Close modal
   };
 
 
@@ -401,8 +446,12 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
   }, []);
 
 const buyItem = (item) => {
+    // Calculate Buy Mod (Base 1.0 + Race Mod)
+    // Example: Elf has 0.10 buyMod -> 1.0 - 0.10 = 0.90 (10% discount)
+    // Example: Orc has -0.10 buyMod -> 1.0 - (-0.10) = 1.10 (10% markup)
+    const buyMult = 1.0 - (player.race?.stats.buyMod || 0);
     // We calculate cost outside, but everything else happens inside the "Safe Zone"
-    const cost = Math.ceil(currentPrices[item] * priceMod); 
+    const cost = Math.ceil(currentPrices[item] * buyMult); 
     
     setResources(prev => {
         // 1. Validations using the 'prev' snapshot (Guaranteed latest data)
@@ -436,9 +485,13 @@ const buyItem = (item) => {
   const sellItem = (item) => {
     setResources(prev => {
         const currentInv = prev.inventory;
-        if (currentInv[item].count <= 0) return prev; // Fail check
+        if (currentInv[item].count <= 0) return prev; 
 
-        const value = Math.floor(currentPrices[item] * priceMod); 
+        // Calculate Sell Mod (Base 1.0 + Race Mod)
+        // Example: Dwarf has 0.10 sellMod -> 1.0 + 0.10 = 1.10 (10% Bonus)
+        const sellMult = 1.0 + (player.race?.stats.sellMod || 0);
+        
+        const value = Math.floor(currentPrices[item] * sellMult); 
         
         return {
             money: prev.money + value,
@@ -456,7 +509,12 @@ const buyItem = (item) => {
         const count = currentInv[item].count;
         if (count <= 0) return prev;
 
-        const value = Math.floor(currentPrices[item] * priceMod);
+        // Calculate Sell Mod (Base 1.0 + Race Mod)
+        // Example: Dwarf has 0.10 sellMod -> 1.0 + 0.10 = 1.10 (10% Bonus)
+        const sellMult = 1.0 + (player.race?.stats.sellMod || 0);
+        
+        const value = Math.floor(currentPrices[item] * sellMult); 
+        
         const totalSale = value * count;
 
         // Optional: We can log here, but React state setters should be pure. 
@@ -485,6 +543,7 @@ const buyUpgrade = (upgrade) => {
     
     if (upgrade.type === 'inventory') setMaxInventory(m => m + upgrade.value);
     if (upgrade.type === 'defense') setDefense(d => d + upgrade.value);
+    if (upgrade.type === 'combat') setCombatBonus(d => d + upgrade.value);
 
     setLog(prev => [`Purchased ${upgrade.name}!`, ...prev]);
   };
@@ -595,13 +654,15 @@ const buyUpgrade = (upgrade) => {
             </div>
         )}
 
-        {/* LEADERBOARD */}
-        <div className="mb-8 bg-black/30 rounded-lg p-4 border border-slate-800">
-            <h3 className="text-xs font-bold text-slate-400 uppercase mb-3 tracking-widest">Global Leaders</h3>
-            {leaderboard.length === 0 ? (
-                <div className="text-xs text-slate-600 italic">No high scores yet...</div>
-            ) : (
-                leaderboard.map((score, i) => (
+        {/* LEADERBOARD WINDOW */}
+        <div className="mb-8 bg-black/30 rounded-lg border border-slate-800 h-32 overflow-hidden relative">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest absolute top-0 left-0 right-0 bg-slate-900/90 p-2 z-10 border-b border-slate-800 text-center">Global Leaders</h3>
+            
+            {/* SCROLLING CONTENT */}
+            <div className="absolute top-8 left-0 right-0 p-2">
+                {/* We duplicate the list so it loops seamlessly */}
+                <div className="scrolling-list">
+                    {[...leaderboard, ...leaderboard].map((score, i) => (
                     <div key={i} className="flex justify-between text-sm items-center mb-1 border-b border-slate-800/50 pb-1 last:border-0">
                         <span className="text-slate-400 flex gap-2">
                             <span className="text-slate-600 font-mono w-4">{i+1}.</span> 
@@ -612,8 +673,9 @@ const buyUpgrade = (upgrade) => {
                             {score.final_score.toLocaleString()}
                         </span>
                     </div>
-                ))
-            )}
+                ))}
+                </div>
+            </div>
         </div>
         
         {/* CREATE CHARACTER */}
@@ -787,19 +849,30 @@ const buyUpgrade = (upgrade) => {
       <div className="mb-4">
         <h2 className="text-xs font-bold mb-2 text-slate-500 uppercase tracking-widest">Marketplace</h2>
         <div className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
-            {Object.keys(currentPrices).map((item) => (
-                <MarketItem 
-                    key={item}
-                    item={item}
-                    icon={getIcon(item)}
-                    price={Math.ceil(currentPrices[item] * priceMod)}
-                    myAvg={inventory[item]?.avg || 0}
-                    haveStock={inventory[item]?.count > 0}
-                    onBuy={() => buyItem(item)}
-                    onSell={() => sellItem(item)}
-                    onSellAll={() => sellAll(item)}
-                />
-            ))}
+            {Object.keys(currentPrices).map((item) => {
+                // 1. Calculate the Buy Multiplier (Charisma)
+                const buyMult = 1.0 - (player.race?.stats.buyMod || 0);
+                
+                // 2. Calculate Final Price
+                const displayPrice = Math.ceil(currentPrices[item] * buyMult);
+
+                return (
+                    <MarketItem 
+                        key={item}
+                        item={item}
+                        icon={getIcon(item)}
+                        
+                        // 3. Pass the calculated price
+                        price={displayPrice} 
+                        
+                        myAvg={inventory[item]?.avg || 0}
+                        haveStock={inventory[item]?.count > 0}
+                        onBuy={() => buyItem(item)}
+                        onSell={() => sellItem(item)}
+                        onSellAll={() => sellAll(item)}
+                    />
+                );
+            })}
         </div>
       </div>
 
@@ -866,9 +939,38 @@ const buyUpgrade = (upgrade) => {
       {/* SCREEN FLASH OVERLAY */}
       <div className={`fixed inset-0 pointer-events-none transition-opacity duration-300 ${
           flash === 'red' ? 'bg-red-500/30' : 
-          flash === 'gold' ? 'bg-yellow-500/30' : 
+          flash === 'green' ? 'bg-green-500/30' : 
           'opacity-0'
       }`}></div>
+
+      {/* COMBAT MODAL */}
+      {combatEvent && (
+        <div className="fixed inset-0 z-40 bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-red-500 rounded-lg p-6 w-full max-w-sm text-center shadow-2xl animate-in zoom-in duration-200">
+                <h2 className="text-2xl text-red-500 font-bold mb-2 uppercase">{combatEvent.name} ATTACK!</h2>
+                <p className="text-slate-300 mb-6">{combatEvent.text}</p>
+                
+                <div className="flex gap-3">
+                    <button 
+                        onClick={() => resolveCombat('pay')}
+                        className="flex-1 bg-slate-700 hover:bg-slate-600 border border-slate-500 text-slate-200 py-3 rounded"
+                    >
+                        {combatEvent.goldLoss > 0 ? "Surrender Gold" : "Run Away"}
+                    </button>
+                    
+                    <button 
+                        onClick={() => resolveCombat('fight')}
+                        className="flex-1 bg-red-700 hover:bg-red-600 text-white font-bold py-3 rounded flex flex-col items-center justify-center"
+                    >
+                        <span>FIGHT!</span>
+                        <span className="text-[10px] font-normal opacity-75">
+                            Roll D20 + {combatBonus + (player.race.stats.combat || 0)} vs DC {combatEvent.difficulty}
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
 
     </div>
   )

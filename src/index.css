@@ -31,3 +31,15 @@ body {
   min-height: 100vh;
   background-color: rgba(15, 23, 42, 0.85); /* 85% opacity Slate-900 */
 }
+
+@keyframes scrollUp {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+
+.scrolling-list {
+  animation: scrollUp 20s linear infinite;
+}
+.scrolling-list:hover {
+  animation-play-state: paused; /* Pause when user tries to read */
+}
