@@ -27,17 +27,17 @@ export const CLASSES = [
     { 
       id: 'merchant', name: 'Merchant', desc: 'Born to trade.',
       startingMoney: 1000, 
-      startingDebt: 5000
+      startingDebt: 10000
     },
     { 
       id: 'rogue', name: 'Rogue', desc: 'Low Debt.',
       startingMoney: 300, 
-      startingDebt: 1000
+      startingDebt: 3000
     },
     { 
       id: 'warrior', name: 'Warrior', desc: 'Fighter.',
       startingMoney: 600, 
-      startingDebt: 3000
+      startingDebt: 6000
     }
 ];
 

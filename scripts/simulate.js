@@ -1,7 +1,7 @@
 // scripts/simulate.js
 import { RACES, CLASSES, LOCATIONS, EVENTS, UPGRADES, BASE_PRICES } from '../src/gameData.js';
 
-const SIMULATION_RUNS = 1000;
+const SIMULATION_RUNS = 10000;
 const MAX_DAYS = 31;
 
 let globalStats = {
