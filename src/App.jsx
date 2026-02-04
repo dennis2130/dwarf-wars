@@ -37,6 +37,7 @@ import { RACES, CLASSES, EVENTS, LOCATIONS, UPGRADES, BASE_PRICES, validateName 
 import { supabase } from './supabaseClient'
 // 1. VISUALS: Import Icons
 import { Coins, Skull, Heart, Shield, ShoppingBag, Map, Gem, UtensilsCrossed, FlaskConical, Sword, RotateCcw, LogOut } from 'lucide-react'
+import ScrambleDie from './components/ScrambleDie';
 import { useRef } from 'react';
 
 function useLongPress(callback, ms = 100) {
@@ -111,6 +112,8 @@ function useLongPress(callback, ms = 100) {
     );
 };
 
+
+
 function App() {
   // --- AUTH STATE ---
   const [session, setSession] = useState(null);
@@ -128,6 +131,10 @@ function App() {
   // --- COMBAT STATE ---
   const [combatEvent, setCombatEvent] = useState(null); // { enemy: 'Thief', damage: 30, gold: 500, dc: 12 }
   const [combatBonus, setCombatBonus] = useState(0);
+
+  // --- ROLL STATE ---
+  const [isRolling, setIsRolling] = useState(false);
+  const [rollTarget, setRollTarget] = useState(null);
   
   // --- PLAYER STATE ---
   const [player, setPlayer] = useState({ name: '', race: null, class: null });
@@ -204,6 +211,11 @@ function App() {
         });
         setLeaderboard(cleanLeaderboard);
     }
+  };
+  // --- HELPERS ---
+  const triggerFlash = (color) => {
+      setFlash(color);
+      setTimeout(() => setFlash(''), 300); // Clears it after 300ms
   };
 
   const fetchSavedCharacters = async () => {
@@ -291,6 +303,7 @@ function App() {
     setDefense(def);
     setPlayerItems([]);
     setDay(1);
+    setCombatBonus(0); 
     
     // RESET LOCATION & PRICES
     const startLoc = LOCATIONS[0];
@@ -336,12 +349,48 @@ function App() {
       setResources(prev => ({ ...prev, money: Math.max(0, prev.money + amount) }));
   };
 
+    const generateLoot = (enemyType) => {
+    // 1. Determine Tier (Dragon = High, Bandit = Low)
+    const tier = enemyType === 'Dragon' ? 5 : 1;
+    
+    const roll = Math.random();
+    
+    if (roll < 0.5) {
+        // 50% Chance: Gold Reward
+        const gold = 100 * tier * (Math.floor(Math.random() * 5) + 1); // 100-500 for bandit, 500-2500 for Dragon
+        updateMoney(gold);
+        setLog(prev => [`Looted ${gold}g from the corpse.`, ...prev]);
+       triggerFlash('gold');
+    } 
+    else if (roll < 0.8) {
+        // 30% Chance: Health (Found food/bandages)
+        const heal = 10 * tier;
+        setHealth(h => Math.min(h + heal, maxHealth));
+        setLog(prev => [`Found supplies. Healed ${heal} HP.`, ...prev]);
+        triggerFlash('green');
+    }
+    else {
+        // 20% Chance: Inventory Slot (Found a bag)
+        const slots = 2 * tier;
+        setMaxInventory(m => m + slots);
+        setLog(prev => [`Found a ${enemyType === 'Dragon' ? 'Chest' : 'Pouch'}. Inventory +${slots}.`, ...prev]);
+    }
+  };
+
   const triggerRandomEvent = (locObj) => {
-    // 1. Travel Fatigue (Happens every time)
+    // 1. BLEED MECHANIC (Replaces Fatigue)
     setHealth(h => {
-        const newH = h - 2; 
-        if (newH <= 0) setTimeout(triggerGameOver, 500);
-        return newH;
+        const threshold = Math.floor(maxHealth * 0.25); // 25% of MAX health
+        if (h < threshold) {
+            const newH = h - 5; // Heavier bleed (5 dmg) since it only happens when critical
+            if (newH <= 0) setTimeout(triggerGameOver, 500);
+            
+            // Optional: Log it so player knows why they are dying
+            setLog(prev => ["You are bleeding out! Heal quickly!", ...prev]);
+            triggerFlash('red'); // Visual feedback
+            return newH;
+        }
+        return h;
     });
 
     // 2. Risk Check
@@ -390,8 +439,7 @@ function App() {
 
     // Visuals for peaceful events
     if (event.type === 'money') {
-        setFlash('green');
-        setTimeout(() => setFlash(''), 300); // Add this line
+        triggerFlash('green');
     }
     
     setEventMsg({ text: msg, type: event.type });
@@ -399,37 +447,63 @@ function App() {
     return recalcPrices(locObj, eventPriceMod);
   };
 
-    const resolveCombat = (choice) => {
-    if (!combatEvent) return;
+// --- COMBAT LOGIC ---
 
-    if (choice === 'pay') {
-        if (combatEvent.goldLoss > 0) {
-            setResources(prev => ({...prev, money: Math.floor(prev.money * (1 - combatEvent.goldLoss))}));
-            setLog(prev => [`You paid off the ${combatEvent.name}.`, ...prev]);
-        } else {
-            // If it's a dragon, you can't pay it off, you take damage trying to run
-            setHealth(h => h - (combatEvent.damage / 2));
-            setLog(prev => [`You ran from the ${combatEvent.name} but got scorched.`, ...prev]);
-        }
-    } 
-    else if (choice === 'fight') {
-        // D20 Roll
-        const d20 = Math.ceil(Math.random() * 20);
-        const total = d20 + combatBonus + (player.race.stats.combat || 0);
-        
-        if (total >= combatEvent.difficulty) {
-            setLog(prev => [`VICTORY! Rolled ${total} (DC ${combatEvent.difficulty}). Killed ${combatEvent.name}.`, ...prev]);
-            // Optional: Loot reward?
-        } else {
-            setHealth(h => h - combatEvent.damage);
-            setLog(prev => [`DEFEAT! Rolled ${total} (DC ${combatEvent.difficulty}). Took ${combatEvent.damage} dmg.`, ...prev]);
-            if (combatEvent.goldLoss > 0) {
-                 setResources(prev => ({...prev, money: Math.floor(prev.money * (1 - combatEvent.goldLoss))}));
-            }
-        }
-    }
-    
-    setCombatEvent(null); // Close modal
+  // 1. User clicks "Fight"
+  const startCombatRoll = () => {
+      const d20 = Math.ceil(Math.random() * 20); // Decide fate immediately
+      setRollTarget(d20); // Save it for the animation
+      setIsRolling(true); // Start the animation
+  };
+
+  // 2. Animation finishes (Called by ScrambleDie)
+  // RENAMED to match your JSX: handleRollComplete
+  const handleRollComplete = () => {
+      // Small delay to let the user see the final number
+      setTimeout(() => {
+          finishCombat(rollTarget); // Apply damage/loot
+          setIsRolling(false);      // Reset UI
+          setRollTarget(null);      // Clear target
+      }, 800);
+  };
+
+  // 3. The Math (Apply damage/loot)
+  const finishCombat = (d20Roll) => {
+      if (!combatEvent) return;
+
+      const total = d20Roll + combatBonus + (player.race.stats.combat || 0);
+      
+      if (total >= combatEvent.difficulty) {
+          triggerFlash('green');
+          setLog(prev => [`VICTORY! Rolled ${d20Roll} (+${total - d20Roll}) vs DC ${combatEvent.difficulty}.`, ...prev]);
+          generateLoot(combatEvent.name);
+      } else {
+          setHealth(h => h - combatEvent.damage);
+          triggerFlash('red');
+          setLog(prev => [`DEFEAT! Rolled ${d20Roll} (+${total - d20Roll}) vs DC ${combatEvent.difficulty}. Took ${combatEvent.damage} dmg.`, ...prev]);
+          
+          if (combatEvent.goldLoss > 0) {
+               setResources(prev => ({...prev, money: Math.floor(prev.money * (1 - combatEvent.goldLoss))}));
+          }
+      }
+      setCombatEvent(null);
+  };
+
+  // 4. Handle "Run Away" (No dice needed)
+  const resolveRunAway = () => {
+      if (!combatEvent) return;
+      
+      if (combatEvent.goldLoss > 0) {
+          // Thief: Pay them off
+          setResources(prev => ({...prev, money: Math.floor(prev.money * (1 - combatEvent.goldLoss))}));
+          setLog(prev => [`You paid off the ${combatEvent.name}.`, ...prev]);
+      } else {
+          // Dragon: Run and take damage
+          setHealth(h => h - (combatEvent.damage / 2));
+          triggerFlash('red');
+          setLog(prev => [`You ran from the ${combatEvent.name} but got scorched.`, ...prev]);
+      }
+      setCombatEvent(null);
   };
 
 
@@ -531,20 +605,48 @@ const buyItem = (item) => {
   };
 
   // 3. THEME: Buy Upgrades
-const buyUpgrade = (upgrade) => {
-    // Check against 'money' (which is destructured from resources at the top of component)
-    if (money < upgrade.cost) return setLog(prev => ["Too expensive!", ...prev]);
+  const buyUpgrade = (upgrade) => {
+    if (resources.money < upgrade.cost) return setLog(prev => ["Too expensive!", ...prev]);
+
+    // NEW: Handle Consumables (Don't add to playerItems)
+    if (upgrade.type === 'heal') {
+        if (health >= maxHealth) return setLog(prev => ["You are already healthy!", ...prev]);
+        
+        const healAmount = Math.floor(maxHealth * upgrade.value);
+        setHealth(h => Math.min(h + healAmount, maxHealth));
+        setResources(prev => ({ ...prev, money: prev.money - upgrade.cost }));
+        setLog(prev => [`Drank ${upgrade.name}. Felt amazing.`, ...prev]);
+        triggerFlash('green'); // Green flash for healing
+        return; // EXIT FUNCTION (Don't add to inventory list)
+    }
+    
+    // Check if we already have this specific item
     if (playerItems.find(i => i.id === upgrade.id)) return setLog(prev => ["Already own that!", ...prev]);
 
-    // UPDATE: Use setResources to deduct money
-    setResources(prev => ({ ...prev, money: prev.money - upgrade.cost }));
-    
-    setPlayerItems([...playerItems, upgrade]);
-    
-    if (upgrade.type === 'inventory') setMaxInventory(m => m + upgrade.value);
-    if (upgrade.type === 'defense') setDefense(d => d + upgrade.value);
-    if (upgrade.type === 'combat') setCombatBonus(d => d + upgrade.value);
+    // LOGIC CHANGE: If buying a weapon, remove existing weapon first
+    let newItems = [...playerItems];
+    let currentCombatBonus = combatBonus;
 
+    if (upgrade.type === 'combat') {
+        // Find existing weapon
+        const oldWeapon = newItems.find(i => i.type === 'combat');
+        if (oldWeapon) {
+            // Remove its bonus
+            currentCombatBonus -= oldWeapon.value;
+            // Remove from list
+            newItems = newItems.filter(i => i.id !== oldWeapon.id);
+            setLog(prev => [`Discarded ${oldWeapon.name}...`, ...prev]);
+        }
+        // Add new bonus
+        setCombatBonus(currentCombatBonus + upgrade.value);
+    } 
+    
+    // Logic for other types (inventory/defense) stays additive
+    if (upgrade.type === 'inventory') setMaxInventory(m => m + upgrade.value);
+    // Note: If you have 'defense' items (shields), do you want those to stack? Assuming yes for now.
+
+    setResources(prev => ({ ...prev, money: prev.money - upgrade.cost }));
+    setPlayerItems([...newItems, upgrade]);
     setLog(prev => [`Purchased ${upgrade.name}!`, ...prev]);
   };
 
@@ -713,13 +815,15 @@ const buyUpgrade = (upgrade) => {
             </button>
         </div>
 
-        {/* HELP CONTENT (Collapsible) */}
+{/* HELP CONTENT (Collapsible) */}
         {showHelp && (
-            <div className="mt-4 bg-black/40 rounded-lg p-4 border border-slate-800 text-sm animate-in fade-in slide-in-from-top-4 duration-300">
+            <div className="mt-4 bg-black/40 rounded-lg p-4 border border-slate-800 text-sm animate-in fade-in slide-in-from-top-4 duration-300 shadow-xl">
                 
                 {/* LORE */}
                 <div className="mb-6">
-                    <h3 className="text-yellow-500 font-bold uppercase tracking-widest mb-2 border-b border-slate-800 pb-1">The Iron Bank Calls</h3>
+                    <h3 className="text-yellow-500 font-bold uppercase tracking-widest mb-2 border-b border-slate-800 pb-1 flex items-center gap-2">
+                        <Shield size={14}/> The Iron Bank Calls
+                    </h3>
                     <p className="text-slate-400 text-xs leading-relaxed italic">
                         "The Realm is in chaos. Dragons burn the skies, goblins run the slums, and inflation is rampant. 
                         You have <strong>31 Days</strong> to turn your measly pocket change into a fortune."
@@ -729,6 +833,19 @@ const buyUpgrade = (upgrade) => {
                         But beware—the Loan Shark charges <strong>5% daily interest</strong>. 
                         Pay him back, or face the consequences.
                     </p>
+                </div>
+
+                {/* SURVIVAL GUIDE (New Section) */}
+                <div className="mb-6">
+                    <h3 className="text-red-400 font-bold uppercase tracking-widest mb-2 border-b border-slate-800 pb-1 flex items-center gap-2">
+                        <Skull size={14}/> Survival Guide
+                    </h3>
+                    <ul className="text-xs text-slate-400 space-y-2 list-disc list-inside">
+                        <li><strong className="text-white">Combat:</strong> Thieves and Dragons will attack. You can Pay (lose gold) or Fight (Roll D20 + Weapons).</li>
+                        <li><strong className="text-white">Bleed:</strong> If your Health drops below 25%, you will bleed out while traveling. Heal up!</li>
+                        <li><strong className="text-white">Potions:</strong> The <strong>Elixir of Life</strong> (5000g) heals 75% of your max HP instantly.</li>
+                        <li><strong className="text-white">Loot:</strong> Defeating enemies grants Gold, Supplies, or Inventory Slots.</li>
+                    </ul>
                 </div>
 
                 {/* RACES */}
@@ -747,7 +864,7 @@ const buyUpgrade = (upgrade) => {
 
                 {/* CLASSES */}
                 <div>
-                    <h3 className="text-red-400 font-bold uppercase tracking-widest mb-2 border-b border-slate-800 pb-1">Classes</h3>
+                    <h3 className="text-green-400 font-bold uppercase tracking-widest mb-2 border-b border-slate-800 pb-1">Classes</h3>
                     <div className="space-y-3">
                         {CLASSES.map(c => (
                             <div key={c.id} className="flex flex-col">
@@ -940,6 +1057,7 @@ const buyUpgrade = (upgrade) => {
       <div className={`fixed inset-0 pointer-events-none transition-opacity duration-300 ${
           flash === 'red' ? 'bg-red-500/30' : 
           flash === 'green' ? 'bg-green-500/30' : 
+          flash === 'gold' ? 'bg-yellow-500/30' : 
           'opacity-0'
       }`}></div>
 
@@ -949,23 +1067,54 @@ const buyUpgrade = (upgrade) => {
             <div className="bg-slate-900 border border-red-500 rounded-lg p-6 w-full max-w-sm text-center shadow-2xl animate-in zoom-in duration-200">
                 <h2 className="text-2xl text-red-500 font-bold mb-2 uppercase">{combatEvent.name} ATTACK!</h2>
                 <p className="text-slate-300 mb-6">{combatEvent.text}</p>
+
+                {/* DICE AREA */}
+                <div className="h-40 flex items-center justify-center bg-slate-800 rounded-lg mb-4 relative overflow-hidden border border-slate-700">
+                    
+                    {isRolling && rollTarget ? (
+                        <ScrambleDie 
+                            target={rollTarget} 
+                            onComplete={handleRollComplete} 
+                        />
+                    ) : (
+                        // Static "Ready to Roll" State
+                        <div className="relative w-32 h-32 flex items-center justify-center opacity-50">
+                             {/* Static Icon */}
+                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="w-full h-full text-slate-500">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 7v10l10 5 10-5V7" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 22V12" />
+                             </svg>
+                             <div className="absolute text-xl font-bold text-slate-400">D20</div>
+                        </div>
+                    )}
+                </div>
                 
                 <div className="flex gap-3">
+                    {/* RUN BUTTON */}
                     <button 
-                        onClick={() => resolveCombat('pay')}
-                        className="flex-1 bg-slate-700 hover:bg-slate-600 border border-slate-500 text-slate-200 py-3 rounded"
+                        onClick={resolveRunAway} // Changed from resolveCombat('pay')
+                        disabled={isRolling} // Disable while rolling
+                        className="flex-1 bg-slate-700 hover:bg-slate-600 border border-slate-500 text-slate-200 py-3 rounded disabled:opacity-50"
                     >
                         {combatEvent.goldLoss > 0 ? "Surrender Gold" : "Run Away"}
                     </button>
                     
+                    {/* FIGHT BUTTON */}
                     <button 
-                        onClick={() => resolveCombat('fight')}
-                        className="flex-1 bg-red-700 hover:bg-red-600 text-white font-bold py-3 rounded flex flex-col items-center justify-center"
+                        onClick={startCombatRoll} // Changed from resolveCombat('fight')
+                        disabled={isRolling} // Disable while rolling
+                        className="flex-1 bg-red-700 hover:bg-red-600 text-white font-bold py-3 rounded flex flex-col items-center justify-center disabled:opacity-50"
                     >
-                        <span>FIGHT!</span>
-                        <span className="text-[10px] font-normal opacity-75">
-                            Roll D20 + {combatBonus + (player.race.stats.combat || 0)} vs DC {combatEvent.difficulty}
-                        </span>
+                        {isRolling ? (
+                            <span>ROLLING...</span>
+                        ) : (
+                            <>
+                                <span>FIGHT!</span>
+                                <span className="text-[10px] font-normal opacity-75">
+                                    Roll D20 + {combatBonus + (player.race.stats.combat || 0)}
+                                </span>
+                            </>
+                        )}
                     </button>
                 </div>
             </div>

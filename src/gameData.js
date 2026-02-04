@@ -82,7 +82,10 @@ export const UPGRADES = [
     // NEW WEAPONS (Combat Bonus instead of flat defense)
     { id: 'dagger', name: 'Iron Dagger', type: 'combat', value: 2, cost: 500, desc: "+2 Combat Roll" },
     { id: 'sword', name: 'Steel Sword', type: 'combat', value: 5, cost: 2000, desc: "+5 Combat Roll" },
-    { id: 'axe', name: 'Mithril Axe', type: 'combat', value: 10, cost: 8000, desc: "+10 Combat Roll" }
+    { id: 'axe', name: 'Mithril Axe', type: 'combat', value: 10, cost: 8000, desc: "+10 Combat Roll" },
+
+    // NEW: Consumable
+    { id: 'elixir', name: 'Elixir of Life', type: 'heal', value: 0.75, cost: 5000, desc: "Heals 75% HP" }
 ];
 
 export const EVENTS = [
