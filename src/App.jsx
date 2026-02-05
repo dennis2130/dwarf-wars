@@ -1007,16 +1007,25 @@ const buyItem = (item) => {
       </div>
 
       {/* TABS */}
-      <div className="flex border-b border-slate-700 mb-4">
-        <button onClick={() => setActiveTab('market')} className={`flex-1 pb-2 text-sm font-bold ${activeTab === 'market' ? 'text-yellow-500 border-b-2 border-yellow-500' : 'text-slate-500'}`}>Market</button>
-        <button onClick={() => setActiveTab('equipment')} className={`flex-1 pb-2 text-sm font-bold ${activeTab === 'equipment' ? 'text-yellow-500 border-b-2 border-yellow-500' : 'text-slate-500'}`}>Armory & Stables</button>
+      <div className="flex border-b border-slate-700 mb-2">
+        <button 
+            onClick={() => setActiveTab('market')} 
+            className={`flex-1 pb-2 text-xs font-bold ${activeTab === 'market' ? 'text-yellow-500 border-b-2 border-yellow-500' : 'text-slate-500 hover:text-slate-300'}`}
+        >
+            Marketplace
+        </button>
+        <button 
+            onClick={() => setActiveTab('equipment')} 
+            className={`flex-1 pb-2 text-xs font-bold ${activeTab === 'equipment' ? 'text-yellow-500 border-b-2 border-yellow-500' : 'text-slate-500 hover:text-slate-300'}`}
+        >
+            Available Upgrades
+        </button>
       </div>
 
       {activeTab === 'market' ? (
         <>
       {/* MARKETPLACE */}
       <div className="mb-4">
-        <h2 className="text-xs font-bold mb-2 text-slate-500 uppercase tracking-widest">Marketplace</h2>
         <div className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
             {Object.keys(currentPrices).map((item) => {
                 // 1. Calculate the Buy Multiplier (Charisma)
@@ -1046,7 +1055,8 @@ const buyItem = (item) => {
       </div>
 
       {/* INVENTORY */}
-      <div className="mb-2 flex-grow">
+      {/* INVENTORY - Dynamic Height */}
+      <div className="mb-2">
         <div className="flex justify-between items-end mb-1">
             <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Inventory</h2>
             <span className="text-[10px] text-slate-400">
@@ -1054,25 +1064,32 @@ const buyItem = (item) => {
             </span>
         </div>
         
-        {/* COMPACT GRID: 4 Columns, Tighter Spacing */}
-        <div className="grid grid-cols-4 gap-1 text-center">
-            {Object.entries(inventory).map(([key, data]) => (
-                <div key={key} className={`p-1 rounded border border-slate-700 flex flex-col items-center justify-center ${data.count > 0 ? 'bg-slate-800' : 'bg-slate-900 opacity-40'}`}>
-                    <div className="text-slate-400 mb-0.5">
-                        {getIcon(key)}
-                    </div>
-                    {/* Smaller, bolder number */}
-                    <div className="text-white font-bold text-sm leading-none">
-                        {data.count}
-                    </div>
+        <div className="grid grid-cols-4 gap-1 text-center min-h-[3rem]">
+            {Object.entries(inventory).filter(([_, data]) => data.count > 0).length === 0 ? (
+                // EMPTY STATE
+                <div className="col-span-4 flex items-center justify-center text-[10px] text-slate-600 italic border border-slate-800 rounded bg-slate-900/50">
+                    Empty Pockets
                 </div>
-            ))}
+            ) : (
+                // ACTIVE ITEMS ONLY
+                Object.entries(inventory)
+                    .filter(([_, data]) => data.count > 0) // <--- The Filter
+                    .map(([key, data]) => (
+                        <div key={key} className="p-1 rounded border border-slate-700 flex flex-col items-center justify-center bg-slate-800 animate-in zoom-in duration-200">
+                            <div className="text-slate-400 mb-0.5">
+                                {getIcon(key)}
+                            </div>
+                            <div className="text-white font-bold text-sm leading-none">
+                                {data.count}
+                            </div>
+                        </div>
+                ))
+            )}
         </div>
       </div>
         </>
       ) : (
         <div className="mb-4 flex-grow">
-            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Available Upgrades</h2>
             <div className="space-y-2">
                 {UPGRADES.map((u) => {
                     const owned = playerItems.find(i => i.id === u.id);
