@@ -68,25 +68,22 @@ function useLongPress(callback, ms = 100) {
 
 
 
-  const MarketItem = ({ item, price, myAvg, haveStock, onBuy, onSell, onSellAll, icon }) => {
-    // Determine Profit Color
+// --- SUB-COMPONENT: Market Item Row ---
+const MarketItem = ({ item, price, myAvg, haveStock, onBuy, onSell, onSmartMax, icon }) => {
     let priceColor = "text-yellow-500";
     if (haveStock) {
-        if (price > myAvg) priceColor = "text-green-400"; // Profit
-        if (price < myAvg) priceColor = "text-red-400";   // Loss
+        if (price > myAvg) priceColor = "text-green-400"; 
+        if (price < myAvg) priceColor = "text-red-400";   
     }
 
-    // Now it is legal to call this hook here!
     const buyEvents = useLongPress(onBuy);
     const sellEvents = useLongPress(onSell);
 
-
-
     return (
         <div className="flex justify-between items-center p-3 border-b border-slate-700 last:border-0">
-            <div className="w-1/3">
-                <div className="font-bold text-slate-300 flex items-center gap-2 capitalize">
-                    {icon} {item}
+            <div className="w-1/3 min-w-0">
+                <div className="font-bold text-slate-300 flex items-center gap-2 capitalize truncate">
+                    {icon} <span className="truncate">{item}</span>
                 </div>
                 {haveStock && (
                     <div className="text-[10px] text-slate-500">
@@ -95,19 +92,25 @@ function useLongPress(callback, ms = 100) {
                 )}
             </div>
             
-            <div className={`w-1/3 text-center font-mono ${priceColor}`}>
+            <div className={`w-1/4 text-center font-mono text-sm ${priceColor}`}>
                 {price} g
             </div>
             
-            <div className="w-1/3 flex justify-end gap-1">
-                <button {...buyEvents} className="bg-green-700 hover:bg-green-600 px-3 py-2 rounded text-xs font-bold active:scale-95 transition-transform select-none">
+            <div className="flex-1 flex justify-end gap-1">
+                <button {...buyEvents} className="bg-green-700 hover:bg-green-600 px-3 py-2 rounded text-xs font-bold active:scale-95 transition-transform select-none text-white">
                     Buy
                 </button>
-                <button {...sellEvents} className="bg-red-700 hover:bg-red-600 px-3 py-2 rounded text-xs font-bold active:scale-95 transition-transform select-none">
+                <button {...sellEvents} className="bg-red-700 hover:bg-red-600 px-3 py-2 rounded text-xs font-bold active:scale-95 transition-transform select-none text-white">
                     Sell
                 </button>
-                <button onClick={onSellAll} className="bg-slate-700 hover:bg-slate-600 px-2 py-2 rounded text-xs font-bold border border-slate-600" title="Sell All">
-                    All
+                
+                {/* SMART BUTTON */}
+                <button 
+                    onClick={onSmartMax} 
+                    className="bg-blue-600 hover:bg-blue-500 px-2 py-2 rounded text-xs font-bold border border-blue-500 active:scale-95 transition-transform text-white" 
+                    title="Smart Max"
+                >
+                    MAX
                 </button>
             </div>
         </div>
@@ -570,6 +573,74 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
     }, 2500);
     return () => clearTimeout(timer);
   }, []);
+
+
+// --- TRADING LOGIC - Buy Max ---
+    const buyMax = (item) => {
+    // 1. Calculate Price
+    const buyMult = 1.0 - (player.race?.stats.buyMod || 0);
+    const cost = Math.ceil(currentPrices[item] * buyMult); 
+    
+    setResources(prev => {
+        const currentMoney = prev.money;
+        const currentInv = prev.inventory;
+        const totalItems = Object.values(currentInv).reduce((a, b) => a + b.count, 0);
+
+        // 2. Limits
+        const spaceLeft = maxInventory - totalItems;
+        const canAfford = Math.floor(currentMoney / cost);
+        const amountToBuy = Math.min(spaceLeft, canAfford);
+
+        if (amountToBuy <= 0) return prev; 
+
+        // 3. Math
+        const currentItemData = currentInv[item];
+        const totalCost = amountToBuy * cost;
+        const totalValue = (currentItemData.count * currentItemData.avg) + totalCost;
+        const newCount = currentItemData.count + amountToBuy;
+        const newAvg = totalValue / newCount;
+
+        // 4. Update
+        return {
+            money: currentMoney - totalCost,
+            inventory: { ...currentInv, [item]: { count: newCount, avg: newAvg } }
+        };
+    });
+  };
+
+  // --- TRADING LOGIC - Smart Max Buy/Sell ---
+    const handleSmartMax = (item) => {
+    const count = resources.inventory[item].count;
+    const avg = resources.inventory[item].avg;
+    
+    // 1. Calculate Prices
+    const buyMult = 1.0 - (player.race?.stats.buyMod || 0);
+    const currentBuyPrice = Math.ceil(currentPrices[item] * buyMult);
+    
+    // Sell Price (Base 1.0 + Race Mod)
+    const sellMult = 1.0 + (player.race?.stats.sellMod || 0);
+    const currentSellPrice = Math.floor(currentPrices[item] * sellMult);
+
+    // LOGIC:
+    // If we have none -> BUY MAX
+    if (count === 0) {
+        buyMax(item);
+        return;
+    }
+
+    // If we have some, check if it's a good deal
+    // Note: Buying raises avg cost, Selling realizes profit.
+    
+    // If current sell price is PROFITABLE (Higher than what we paid), take the win -> SELL ALL
+    if (currentSellPrice > avg) {
+        sellAll(item);
+        return;
+    }
+
+    // If current price is LOWER than what we paid (Red), we might want to "Average Down" -> BUY MAX
+    // (Or if we just want to hoard)
+    buyMax(item);
+  };
 
 const buyItem = (item) => {
     // Calculate Buy Mod (Base 1.0 + Race Mod)
@@ -1047,7 +1118,7 @@ const buyItem = (item) => {
                         haveStock={inventory[item]?.count > 0}
                         onBuy={() => buyItem(item)}
                         onSell={() => sellItem(item)}
-                        onSellAll={() => sellAll(item)}
+                        onSmartMax={() => handleSmartMax(item)}
                     />
                 );
             })}
