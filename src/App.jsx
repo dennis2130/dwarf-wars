@@ -41,83 +41,10 @@ import { Coins, Skull, Heart, Shield, ShoppingBag, Map, Gem, UtensilsCrossed, Fl
 import ScrambleDie from './components/ScrambleDie';
 import { useRef } from 'react';
 
-function useLongPress(callback, ms = 100) {
-  const timerRef = useRef(null);
-
-  const start = () => {
-    if (timerRef.current) return;
-    callback();
-    timerRef.current = setInterval(callback, ms);
-  };
-
-  const stop = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  };
-
-  return {
-    onMouseDown: start,
-    onMouseUp: stop,
-    onMouseLeave: stop,
-    onTouchStart: start,
-    onTouchEnd: stop,
-  };
-}
-
-
-
-
-// --- SUB-COMPONENT: Market Item Row ---
-const MarketItem = ({ item, price, myAvg, haveStock, onBuy, onSell, onSmartMax, icon }) => {
-    let priceColor = "text-yellow-500";
-    if (haveStock) {
-        if (price > myAvg) priceColor = "text-green-400"; 
-        if (price < myAvg) priceColor = "text-red-400";   
-    }
-
-    const buyEvents = useLongPress(onBuy);
-    const sellEvents = useLongPress(onSell);
-
-    return (
-        <div className="flex justify-between items-center p-3 border-b border-slate-700 last:border-0">
-            <div className="w-1/3 min-w-0">
-                <div className="font-bold text-slate-300 flex items-center gap-2 capitalize truncate">
-                    {icon} <span className="truncate">{item}</span>
-                </div>
-                {haveStock && (
-                    <div className="text-[10px] text-slate-500">
-                        Avg: {Math.floor(myAvg)}g
-                    </div>
-                )}
-            </div>
-            
-            <div className={`w-1/4 text-center font-mono text-sm ${priceColor}`}>
-                {price} g
-            </div>
-            
-            <div className="flex-1 flex justify-end gap-1">
-                <button {...buyEvents} className="bg-green-700 hover:bg-green-600 px-3 py-2 rounded text-xs font-bold active:scale-95 transition-transform select-none text-white">
-                    Buy
-                </button>
-                <button {...sellEvents} className="bg-red-700 hover:bg-red-600 px-3 py-2 rounded text-xs font-bold active:scale-95 transition-transform select-none text-white">
-                    Sell
-                </button>
-                
-                {/* SMART BUTTON */}
-                <button 
-                    onClick={onSmartMax} 
-                    className="bg-blue-600 hover:bg-blue-500 px-2 py-2 rounded text-xs font-bold border border-blue-500 active:scale-95 transition-transform text-white" 
-                    title="Smart Max"
-                >
-                    MAX
-                </button>
-            </div>
-        </div>
-    );
-};
-
+import StatsBar from './components/StatsBar';
+import InventoryGrid from './components/InventoryGrid';
+import MarketItem from './components/MarketItem';
+import { getIcon } from './utils';
 
 
 function App() {
@@ -220,7 +147,6 @@ function App() {
         totalDeaths: logs.filter(l => l.status === 'Dead').length,
         totalWins: logs.filter(l => l.score > 0).length,
         highestScore: Math.max(...logs.map(l => l.score), 0),
-        dragonsKilled: logs.reduce((acc, l) => acc + (l.combat_stats?.wins || 0), 0), // Approximation if you don't have explicit dragon kill logs yet
         totalGold: logs.reduce((acc, l) => acc + (l.score > 0 ? l.score : 0), 0), 
         dragonsKilled: logs.reduce((acc, l) => acc + (l.combat_stats?.dragons_killed || 0), 0),
     };
@@ -258,19 +184,14 @@ function App() {
       options: { redirectTo: window.location.origin }
     });
   };
-  // END AUTH: handleGoogleLogin
-  // =======================
+
 
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setPlayer({ name: '', race: null, class: null });
   };
-  // END AUTH: handleLogout
-  // =======================
 
-  // END AUTH METHODS
-  // =======================
 
 
   // =======================
@@ -298,9 +219,7 @@ function App() {
         setLeaderboard(cleanLeaderboard);
     }
   };
-  // ================================
-  // END DATABASE: fetchLeaderboard
-  // ================================
+
 
 
   // --- HELPERS ---
@@ -358,10 +277,7 @@ function App() {
     setIsSaving(false);
     fetchLeaderboard();
   };
-  // END DATABASE: saveScore
-  // =======================
-  // END DATABASE METHODS
-  // =======================
+
 
 
   // =======================
@@ -374,8 +290,7 @@ function App() {
     const classObj = CLASSES.find(c => c.id === char.class_id);
     setPlayer({ name: char.name, race: raceObj, class: classObj });
   };
-  // END CHARACTER: loadCharacter
-  // =======================
+
 
 
   const startGame = () => {
@@ -421,15 +336,12 @@ function App() {
     setLog([`Welcome ${player.name} the ${player.race.name} ${player.class.name}!`, "Good luck."]);
     setGameState('playing');
   };
-  // END CHARACTER: startGame
-  // =======================
+
 
   // NEW: Restart with same character
   const handleRestart = () => {
     if (window.confirm("Restart this run?")) {
         logGameSession('Quit (Restart)'); // Log the reset
-  // END CHARACTER: handleRestart
-  // =======================
         startGame();
     }
   };
@@ -441,10 +353,7 @@ function App() {
         setGameState('start');
     }
   };
-  // END CHARACTER: handleQuit
-  // =======================
-  // END CHARACTER MANAGEMENT
-  // =======================
+
 
 
   // =======================
@@ -466,8 +375,7 @@ function App() {
     setGameState('gameover');
     saveScore(); // Keep your high score logic too
   };
-  // END GAME FLOW: triggerGameOver
-  // =======================
+
 
   // 2. LOCATION LOGIC: Calculate prices based on Location factors
   const recalcPrices = (locObj, randomEventMod = 1.0) => {
@@ -485,8 +393,7 @@ function App() {
   const updateMoney = (amount) => {
       setResources(prev => ({ ...prev, money: Math.max(0, prev.money + amount) }));
   };
-  // END GAME FLOW: updateMoney
-  // =======================
+
 
 
     const generateLoot = (enemyType) => {
@@ -516,10 +423,7 @@ function App() {
         setLog(prev => [`Found a ${enemyType === 'Dragon' ? 'Chest' : 'Pouch'}. Inventory +${slots}.`, ...prev]);
     }
   };
-  // END GAME FLOW: generateLoot
-  // =======================
-  // END GAME FLOW METHODS
-  // =======================
+
 
   const triggerRandomEvent = (locObj) => {
     // 1. BLEED MECHANIC (Replaces Fatigue)
@@ -599,8 +503,7 @@ function App() {
       setRollTarget(d20); // Save it for the animation
       setIsRolling(true); // Start the animation
   };
-  // END COMBAT: startCombatRoll
-  // =======================
+
 
 
   // 2. Animation finishes (Called by ScrambleDie)
@@ -613,8 +516,7 @@ function App() {
           setRollTarget(null);      // Clear target
       }, 800);
   };
-  // END COMBAT: handleRollComplete
-  // =======================
+
 
 
   // 3. The Math (Apply damage/loot)
@@ -646,8 +548,7 @@ function App() {
 
           // TRACK LOSS
           setCombatStats(prev => ({ ...prev, losses: prev.losses + 1 }));
-  // END COMBAT: finishCombat
-  // =======================
+
       }
       setCombatEvent(null);
   };
@@ -668,10 +569,7 @@ function App() {
       // TRACK FLEE
       setCombatStats(prev => ({ ...prev, flees: prev.flees + 1 }));
       
-  // END COMBAT: resolveRunAway
-  // =======================
-  // END COMBAT METHODS
-  // =======================
+
       setCombatEvent(null);
   };
 
@@ -688,9 +586,6 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
     return () => clearTimeout(timer);
   }, []);
 
-
-  // END GAME FLOW METHODS
-  // =======================
 
 
   // =======================
@@ -721,8 +616,6 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
         const totalValue = (currentItemData.count * currentItemData.avg) + totalCost;
         const newCount = currentItemData.count + amountToBuy;
         const newAvg = totalValue / newCount;
-  // END TRADING: buyMax
-  // =======================
 
         // 4. Update
         return {
@@ -763,8 +656,7 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
 
     // If current price is LOWER than what we paid (Red), we might want to "Average Down" -> BUY MAX
     // (Or if we just want to hoard)
-  // END TRADING: handleSmartMax
-  // =======================
+
 
     buyMax(item);
   };
@@ -802,8 +694,7 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
                 ...currentInv,
                 [item]: { count: newCount, avg: newAvg }
             }
-  // END TRADING: buyItem
-  // =======================
+
 
         };
     });
@@ -823,9 +714,6 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
         return {
             money: prev.money + value,
             inventory: {
-  // END TRADING: sellItem
-  // =======================
-
                 ...currentInv,
                 [item]: { ...currentInv[item], count: currentInv[item].count - 1 }
             }
@@ -853,8 +741,6 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
         return {
             money: prev.money + totalSale,
             inventory: {
-  // END TRADING: sellAll
-  // =======================
                 ...currentInv,
                 [item]: { count: 0, avg: 0 }
             }
@@ -902,8 +788,7 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
     // Logic for other types (inventory/defense) stays additive
     if (upgrade.type === 'inventory') setMaxInventory(m => m + upgrade.value);
     // Note: If you have 'defense' items (shields), do you want those to stack? Assuming yes for now.
-  // END TRADING: buyUpgrade
-  // =======================
+
 
 
     setResources(prev => ({ ...prev, money: prev.money - upgrade.cost }));
@@ -920,10 +805,6 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
         const amount = Math.min(prev.money, debt);
         
         // Side Effect: Update Debt (Since Debt is its own state, this is safe to do here)
-  // END TRADING: payDebt
-  // =======================
-  // END TRADING METHODS
-  // =======================
 
         setDebt(d => d - amount);
         
@@ -957,10 +838,6 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
         default: return <ShoppingBag size={16} />;
     }
   };
-  // END UTILITIES: getIcon
-  // =======================
-  // END UTILITY METHODS
-  // =======================
 
 
   // =======================
@@ -974,8 +851,6 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
             <h1 className="text-5xl font-bold mb-4 text-red-600 flex items-center gap-2"><Skull size={48}/> GAME OVER</h1>
             <div className="bg-slate-900 p-6 rounded-lg border border-slate-700 w-full max-w-sm">
                 <div className="text-2xl mb-2">Final Score</div>
-  // END RENDER: GAME OVER
-  // =======================
                 <div className={`text-4xl font-bold mb-4 ${money - debt >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                     {money - debt}
                 </div>
@@ -1180,8 +1055,6 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
         )}
         </div>
       </div>
-  // END RENDER: START SCREEN
-  // =======================
     );
   }
   // --- RENDER: PROFILE ---
@@ -1299,35 +1172,7 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
 
       {eventMsg && <div className={`mb-4 p-3 rounded text-center text-sm font-bold border ${eventMsg.type === 'damage' || eventMsg.type === 'theft' ? 'bg-red-900/50 border-red-500 text-red-200' : 'bg-green-900/50 border-green-500 text-green-200'}`}>{eventMsg.text}</div>}
 
-      <div className="grid grid-cols-3 gap-2 mb-4 text-center">
-        {/* GOLD */}
-        <div className="bg-slate-800 p-2 rounded shadow flex flex-col items-center">
-            <span className="text-xs text-slate-400 flex items-center gap-1"><Coins size={12}/> GOLD</span>
-            <span className="text-green-400 font-bold">{money}</span>
-        </div>
-
-        {/* DEBT */}
-        <div className="bg-slate-800 p-2 rounded shadow flex flex-col items-center">
-            <span className="text-xs text-slate-400 flex items-center gap-1"><Skull size={12}/> DEBT</span>
-            <div className="text-red-400 font-bold">
-                {debt} {debt > 0 && <span onClick={payDebt} className="text-[10px] underline text-blue-400 cursor-pointer ml-1">Pay</span>}
-            </div>
-        </div>
-
-        {/* HEALTH (With Bar) */}
-        <div className="bg-slate-800 p-2 rounded shadow flex flex-col items-center justify-between w-full">
-            <span className="text-xs text-slate-400 flex items-center gap-1"><Heart size={12}/> HP</span>
-            <span className={`${health < 30 ? 'text-red-500 animate-pulse' : 'text-blue-400'} font-bold`}>{health}/{maxHealth}</span>
-            
-            {/* PROGRESS BAR - Now properly nested inside the Health Card */}
-            <div className="w-full bg-slate-900 h-1.5 rounded-full mt-1 overflow-hidden border border-slate-700">
-                <div 
-                    className={`${health < 30 ? 'bg-red-500' : 'bg-blue-500'} h-full transition-all duration-500`} 
-                    style={{ width: `${Math.max(0, (health / maxHealth) * 100)}%` }}
-                ></div>
-            </div>
-        </div>
-      </div>
+    <StatsBar money={resources.money} debt={debt} health={health} maxHealth={maxHealth} onPayDebt={payDebt} />
 
       {/* TABS */}
       <div className="flex border-b border-slate-700 mb-2">
@@ -1378,38 +1223,7 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
           </div>
 
           {/* INVENTORY */}
-          {/* INVENTORY - Dynamic Height */}
-          <div className="mb-2">
-            <div className="flex justify-between items-end mb-1">
-                <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Inventory</h2>
-                <span className="text-[10px] text-slate-400">
-                    {Object.values(inventory).reduce((a, b) => a + b.count, 0)} / {maxInventory}
-                </span>
-            </div>
-            
-            <div className="grid grid-cols-4 gap-1 text-center min-h-[3rem]">
-                {Object.entries(inventory).filter(([_, data]) => data.count > 0).length === 0 ? (
-                    // EMPTY STATE
-                    <div className="col-span-4 flex items-center justify-center text-[10px] text-slate-600 italic border border-slate-800 rounded bg-slate-900/50">
-                        Empty Pockets
-                    </div>
-                ) : (
-                    // ACTIVE ITEMS ONLY
-                    Object.entries(inventory)
-                        .filter(([_, data]) => data.count > 0) // <--- The Filter
-                        .map(([key, data]) => (
-                            <div key={key} className="p-1 rounded border border-slate-700 flex flex-col items-center justify-center bg-slate-800 animate-in zoom-in duration-200">
-                                <div className="text-slate-400 mb-0.5">
-                                    {getIcon(key)}
-                                </div>
-                                <div className="text-white font-bold text-sm leading-none">
-                                    {data.count}
-                                </div>
-                            </div>
-                        ))
-                )}
-            </div>
-          </div>
+        <InventoryGrid inventory={resources.inventory} maxInventory={maxInventory} />
         </>
       ) : (
         <div className="mb-4 flex-grow">
@@ -1516,12 +1330,6 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
     </div>
     
   );
-
-  
-  // END RENDER: MAIN GAME
-  // =======================
-  // END RENDER METHODS
-  // =======================
 }
 
 export default App;
