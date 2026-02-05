@@ -66,6 +66,8 @@ function useLongPress(callback, ms = 100) {
 }
 
 
+
+
   const MarketItem = ({ item, price, myAvg, haveStock, onBuy, onSell, onSellAll, icon }) => {
     // Determine Profit Color
     let priceColor = "text-yellow-500";
@@ -130,6 +132,7 @@ function App() {
 
   // --- COMBAT STATE ---
   const [combatEvent, setCombatEvent] = useState(null); // { enemy: 'Thief', damage: 30, gold: 500, dc: 12 }
+  const [combatStats, setCombatStats] = useState({ wins: 0, losses: 0, flees: 0 });
   const [combatBonus, setCombatBonus] = useState(0);
 
   // --- ROLL STATE ---
@@ -161,6 +164,30 @@ function App() {
   // --- CONFIG ---
   const MAX_DAYS = 31;
   const [currentPrices, setCurrentPrices] = useState(BASE_PRICES);
+
+  // --- LOGGING FUNCTION ---
+  const logGameSession = async (status, cause = null) => {
+    // 1. Gather Data
+    const sessionData = {
+        user_email: session?.user?.email || 'Anonymous',
+        char_name: player.name,
+        race: player.race?.name,
+        class: player.class?.name,
+        score: resources.money - debt,
+        status: status,
+        days_survived: day,
+        upgrades: playerItems.map(i => i.name), // Just save names
+        combat_stats: combatStats,
+        cause_of_death: cause
+    };
+
+    // 2. Send to Supabase (Fire and Forget - don't await)
+    supabase.from('game_logs').insert([sessionData]).then(({ error }) => {
+        if (error) console.error("Telemetry Error:", error);
+    });
+  };
+
+
 
   // --- INIT ---
   useEffect(() => {
@@ -304,6 +331,7 @@ function App() {
     setPlayerItems([]);
     setDay(1);
     setCombatBonus(0); 
+    setCombatStats({ wins: 0, losses: 0, flees: 0 });
     
     // RESET LOCATION & PRICES
     const startLoc = LOCATIONS[0];
@@ -315,7 +343,8 @@ function App() {
   };
   // NEW: Restart with same character
   const handleRestart = () => {
-    if (window.confirm("Restart this run? You will lose current progress.")) {
+    if (window.confirm("Restart this run?")) {
+        logGameSession('Quit (Restart)'); // Log the reset
         startGame();
     }
   };
@@ -323,13 +352,24 @@ function App() {
   // NEW: Quit to Main Menu
   const handleQuit = () => {
     if (window.confirm("Quit to Character Select?")) {
+        logGameSession('Quit (Menu)'); // Log the quit
         setGameState('start');
     }
   };
+  const triggerGameOver = (cause = null) => {
+    // Determine if dead or just time up
+    const isDead = health <= 0;
+    const finalScore = resources.money - debt;
+    
+    let status = 'Win';
+    if (isDead) status = 'Dead';
+    else if (finalScore < 0) status = 'Bankrupt';
+    
+    // Log it!
+    logGameSession(status, cause || (isDead ? 'Unknown' : 'Time Limit'));
 
-  const triggerGameOver = () => {
     setGameState('gameover');
-    saveScore();
+    saveScore(); // Keep your high score logic too
   };
 
   // 2. LOCATION LOGIC: Calculate prices based on Location factors
@@ -474,35 +514,47 @@ function App() {
       const total = d20Roll + combatBonus + (player.race.stats.combat || 0);
       
       if (total >= combatEvent.difficulty) {
-          triggerFlash('green');
-          setLog(prev => [`VICTORY! Rolled ${d20Roll} (+${total - d20Roll}) vs DC ${combatEvent.difficulty}.`, ...prev]);
+          triggerFlash('gold');
+          setLog(prev => [`VICTORY! ...`, ...prev]);
           generateLoot(combatEvent.name);
+          
+          // TRACK WIN
+          setCombatStats(prev => ({ ...prev, wins: prev.wins + 1 }));
       } else {
-          setHealth(h => h - combatEvent.damage);
+          setHealth(h => {
+              const newH = h - combatEvent.damage;
+              if (newH <= 0) setTimeout(() => triggerGameOver(combatEvent.name), 500); // Pass cause of death!
+              return newH;
+          });
           triggerFlash('red');
-          setLog(prev => [`DEFEAT! Rolled ${d20Roll} (+${total - d20Roll}) vs DC ${combatEvent.difficulty}. Took ${combatEvent.damage} dmg.`, ...prev]);
+          setLog(prev => [`DEFEAT! ...`, ...prev]);
           
           if (combatEvent.goldLoss > 0) {
                setResources(prev => ({...prev, money: Math.floor(prev.money * (1 - combatEvent.goldLoss))}));
           }
+
+          // TRACK LOSS
+          setCombatStats(prev => ({ ...prev, losses: prev.losses + 1 }));
       }
       setCombatEvent(null);
   };
 
   // 4. Handle "Run Away" (No dice needed)
   const resolveRunAway = () => {
-      if (!combatEvent) return;
+      // ... existing logic (payment/damage) ...
       
-      if (combatEvent.goldLoss > 0) {
-          // Thief: Pay them off
-          setResources(prev => ({...prev, money: Math.floor(prev.money * (1 - combatEvent.goldLoss))}));
-          setLog(prev => [`You paid off the ${combatEvent.name}.`, ...prev]);
-      } else {
-          // Dragon: Run and take damage
-          setHealth(h => h - (combatEvent.damage / 2));
-          triggerFlash('red');
-          setLog(prev => [`You ran from the ${combatEvent.name} but got scorched.`, ...prev]);
+      // If taking damage from Dragon while running, check death
+      if (combatEvent.goldLoss === 0) {
+          setHealth(h => {
+              const newH = h - (combatEvent.damage / 2);
+              if (newH <= 0) setTimeout(() => triggerGameOver(combatEvent.name + " (Fled)"), 500);
+              return newH;
+          });
       }
+
+      // TRACK FLEE
+      setCombatStats(prev => ({ ...prev, flees: prev.flees + 1 }));
+      
       setCombatEvent(null);
   };
 
