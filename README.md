@@ -16,6 +16,8 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 - **Health & Survival:** Monitor your health and combat ability. If your health drops to zero, it's game over!
 - **Debt System:** Start with a debt based on your class. Pay it off before the end of 31 days to maximize your score.
 - **Profanity Filtering:** Character names are validated against a profanity filter to keep the leaderboard clean.
+- **Smart Max Button:** Intelligently buy or sell the maximum amount of an item based on your gold, inventory space, and stock availability.
+- **Game Session Logging:** All game sessions are logged to the database, including player stats, upgrades acquired, and cause of death for analytics and balance improvements.
 - **Leaderboard:** High scores are saved and displayed using Supabase backend.
 - **Google Authentication:** Log in with Google to save and load characters and scores.
 - **Exit & Restart:** You can now exit the game at any time and restart a new session without reloading the page.
@@ -62,6 +64,9 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 ## Controls
 
 - **Market Tab:** Buy and sell items. Hold down the buy/sell buttons to continuously purchase or sell items.
+  - **Buy Button:** Purchase one item per click or hold to buy repeatedly.
+  - **Sell Button:** Sell one item per click or hold to sell repeatedly.
+  - **MAX Button:** Intelligently buys or sells the maximum amount based on your available gold, inventory space, or current stock.
 - **Armory & Stables Tab:** Purchase upgrades (inventory, weapons, consumables).
 - **Travel Button:** Move to a new location and trigger events.
 - **Combat Encounters:** Roll a D20 die with your combat bonus and attempt to defeat enemies. The ScrambleDie animates the outcome.

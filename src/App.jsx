@@ -35,8 +35,9 @@
 import { useState, useEffect } from 'react'
 import { RACES, CLASSES, EVENTS, LOCATIONS, UPGRADES, BASE_PRICES, validateName } from './gameData'
 import { supabase } from './supabaseClient'
+
 // 1. VISUALS: Import Icons
-import { Coins, Skull, Heart, Shield, ShoppingBag, Map, Gem, UtensilsCrossed, FlaskConical, Sword, RotateCcw, LogOut } from 'lucide-react'
+import { Coins, Skull, Heart, Shield, ShoppingBag, Map, Gem, UtensilsCrossed, FlaskConical, Sword, RotateCcw, LogOut, Menu, User, Trophy, X } from 'lucide-react'
 import ScrambleDie from './components/ScrambleDie';
 import { useRef } from 'react';
 
@@ -132,6 +133,8 @@ function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('market'); // 'market' or 'equipment'
   const [flash, setFlash] = useState(''); // 'red', 'green', 'gold'
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [profileData, setProfileData] = useState(null); // Will hold stats
 
   // --- COMBAT STATE ---
   const [combatEvent, setCombatEvent] = useState(null); // { enemy: 'Thief', damage: 30, gold: 500, dc: 12 }
@@ -149,6 +152,7 @@ function App() {
   const [health, setHealth] = useState(100);
   const [defense, setDefense] = useState(0); // Damage reduction
   const [priceMod, setPriceMod] = useState(1); 
+
   // 3. THEME: Track Upgrades
   const [playerItems, setPlayerItems] = useState([]); 
 
@@ -190,7 +194,35 @@ function App() {
     });
   };
 
+  // --- PROFILE FETCHING ---
+  const fetchProfile = async () => {
+    if (!session) return;
+    
+    // 1. Get all logs for this user
+    const { data: logs } = await supabase
+        .from('game_logs')
+        .select('*')
+        .eq('user_email', session.user.email)
+        .order('created_at', { ascending: false });
 
+    if (!logs) return;
+
+    // 2. Calculate Lifetime Stats locally
+    const stats = {
+        totalRuns: logs.length,
+        totalDeaths: logs.filter(l => l.status === 'Dead').length,
+        totalWins: logs.filter(l => l.score > 0).length,
+        highestScore: Math.max(...logs.map(l => l.score), 0),
+        dragonsKilled: logs.reduce((acc, l) => acc + (l.combat_stats?.wins || 0), 0), // Approximation if you don't have explicit dragon kill logs yet
+        totalGold: logs.reduce((acc, l) => acc + (l.score > 0 ? l.score : 0), 0)
+    };
+
+    setProfileData({ stats, history: logs.slice(0, 10) }); // Top 10 recent
+    setGameState('profile'); // Switch view
+    setMenuOpen(false); // Close menu
+  };
+
+  
 
   // --- INIT ---
   useEffect(() => {
@@ -207,20 +239,36 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // --- AUTH FUNCTIONS ---
+
+  // =======================
+  // AUTH METHODS
+  // =======================
+
   const handleGoogleLogin = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.origin }
     });
   };
+  // END AUTH: handleGoogleLogin
+  // =======================
+
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setPlayer({ name: '', race: null, class: null });
   };
+  // END AUTH: handleLogout
+  // =======================
 
-  // --- DB FUNCTIONS ---
+  // END AUTH METHODS
+  // =======================
+
+
+  // =======================
+  // DATABASE METHODS
+  // =======================
+
   const fetchLeaderboard = async () => {
     const { data } = await supabase
       .from('high_scores')
@@ -242,6 +290,11 @@ function App() {
         setLeaderboard(cleanLeaderboard);
     }
   };
+  // ================================
+  // END DATABASE: fetchLeaderboard
+  // ================================
+
+
   // --- HELPERS ---
   const triggerFlash = (color) => {
       setFlash(color);
@@ -252,6 +305,7 @@ function App() {
     const { data } = await supabase.from('saved_characters').select('*');
     if (data) setSavedChars(data);
   };
+
 
   const saveNewCharacter = async () => {
     if (!session) return;
@@ -274,12 +328,14 @@ function App() {
     }
   };
 
+
   const deleteCharacter = async (e, id) => {
     e.stopPropagation(); 
     if (!window.confirm("Banish this hero?")) return;
     const { error } = await supabase.from('saved_characters').delete().eq('id', id);
     if (!error) setSavedChars(savedChars.filter(char => char.id !== id));
   };
+
 
   const saveScore = async () => {
     setIsSaving(true);
@@ -288,12 +344,21 @@ function App() {
         race: player.race.name,
         class: player.class.name,
         gold: resources.money,       // UPDATED: was 'money'
-        debt: debt,
-        final_score: resources.money - debt // UPDATED: was 'money - debt'
+        final_score: resources.money - debt,
+        created_at: new Date()
     }]);
     setIsSaving(false);
     fetchLeaderboard();
   };
+  // END DATABASE: saveScore
+  // =======================
+  // END DATABASE METHODS
+  // =======================
+
+
+  // =======================
+  // CHARACTER MANAGEMENT
+  // =======================
 
   // --- GAME ENGINE ---
   const loadCharacter = (char) => {
@@ -301,6 +366,9 @@ function App() {
     const classObj = CLASSES.find(c => c.id === char.class_id);
     setPlayer({ name: char.name, race: raceObj, class: classObj });
   };
+  // END CHARACTER: loadCharacter
+  // =======================
+
 
   const startGame = () => {
 
@@ -344,10 +412,15 @@ function App() {
     setLog([`Welcome ${player.name} the ${player.race.name} ${player.class.name}!`, "Good luck."]);
     setGameState('playing');
   };
+  // END CHARACTER: startGame
+  // =======================
+
   // NEW: Restart with same character
   const handleRestart = () => {
     if (window.confirm("Restart this run?")) {
         logGameSession('Quit (Restart)'); // Log the reset
+  // END CHARACTER: handleRestart
+  // =======================
         startGame();
     }
   };
@@ -359,6 +432,16 @@ function App() {
         setGameState('start');
     }
   };
+  // END CHARACTER: handleQuit
+  // =======================
+  // END CHARACTER MANAGEMENT
+  // =======================
+
+
+  // =======================
+  // GAME FLOW METHODS
+  // =======================
+
   const triggerGameOver = (cause = null) => {
     // Determine if dead or just time up
     const isDead = health <= 0;
@@ -374,6 +457,8 @@ function App() {
     setGameState('gameover');
     saveScore(); // Keep your high score logic too
   };
+  // END GAME FLOW: triggerGameOver
+  // =======================
 
   // 2. LOCATION LOGIC: Calculate prices based on Location factors
   const recalcPrices = (locObj, randomEventMod = 1.0) => {
@@ -391,6 +476,9 @@ function App() {
   const updateMoney = (amount) => {
       setResources(prev => ({ ...prev, money: Math.max(0, prev.money + amount) }));
   };
+  // END GAME FLOW: updateMoney
+  // =======================
+
 
     const generateLoot = (enemyType) => {
     // 1. Determine Tier (Dragon = High, Bandit = Low)
@@ -419,6 +507,10 @@ function App() {
         setLog(prev => [`Found a ${enemyType === 'Dragon' ? 'Chest' : 'Pouch'}. Inventory +${slots}.`, ...prev]);
     }
   };
+  // END GAME FLOW: generateLoot
+  // =======================
+  // END GAME FLOW METHODS
+  // =======================
 
   const triggerRandomEvent = (locObj) => {
     // 1. BLEED MECHANIC (Replaces Fatigue)
@@ -498,6 +590,9 @@ function App() {
       setRollTarget(d20); // Save it for the animation
       setIsRolling(true); // Start the animation
   };
+  // END COMBAT: startCombatRoll
+  // =======================
+
 
   // 2. Animation finishes (Called by ScrambleDie)
   // RENAMED to match your JSX: handleRollComplete
@@ -509,6 +604,9 @@ function App() {
           setRollTarget(null);      // Clear target
       }, 800);
   };
+  // END COMBAT: handleRollComplete
+  // =======================
+
 
   // 3. The Math (Apply damage/loot)
   const finishCombat = (d20Roll) => {
@@ -538,6 +636,8 @@ function App() {
 
           // TRACK LOSS
           setCombatStats(prev => ({ ...prev, losses: prev.losses + 1 }));
+  // END COMBAT: finishCombat
+  // =======================
       }
       setCombatEvent(null);
   };
@@ -558,6 +658,10 @@ function App() {
       // TRACK FLEE
       setCombatStats(prev => ({ ...prev, flees: prev.flees + 1 }));
       
+  // END COMBAT: resolveRunAway
+  // =======================
+  // END COMBAT METHODS
+  // =======================
       setCombatEvent(null);
   };
 
@@ -574,6 +678,14 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
     return () => clearTimeout(timer);
   }, []);
 
+
+  // END GAME FLOW METHODS
+  // =======================
+
+
+  // =======================
+  // TRADING METHODS
+  // =======================
 
 // --- TRADING LOGIC - Buy Max ---
     const buyMax = (item) => {
@@ -599,6 +711,8 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
         const totalValue = (currentItemData.count * currentItemData.avg) + totalCost;
         const newCount = currentItemData.count + amountToBuy;
         const newAvg = totalValue / newCount;
+  // END TRADING: buyMax
+  // =======================
 
         // 4. Update
         return {
@@ -639,10 +753,13 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
 
     // If current price is LOWER than what we paid (Red), we might want to "Average Down" -> BUY MAX
     // (Or if we just want to hoard)
+  // END TRADING: handleSmartMax
+  // =======================
+
     buyMax(item);
   };
 
-const buyItem = (item) => {
+  const buyItem = (item) => {
     // Calculate Buy Mod (Base 1.0 + Race Mod)
     // Example: Elf has 0.10 buyMod -> 1.0 - 0.10 = 0.90 (10% discount)
     // Example: Orc has -0.10 buyMod -> 1.0 - (-0.10) = 1.10 (10% markup)
@@ -675,6 +792,9 @@ const buyItem = (item) => {
                 ...currentInv,
                 [item]: { count: newCount, avg: newAvg }
             }
+  // END TRADING: buyItem
+  // =======================
+
         };
     });
   };
@@ -693,6 +813,9 @@ const buyItem = (item) => {
         return {
             money: prev.money + value,
             inventory: {
+  // END TRADING: sellItem
+  // =======================
+
                 ...currentInv,
                 [item]: { ...currentInv[item], count: currentInv[item].count - 1 }
             }
@@ -720,6 +843,8 @@ const buyItem = (item) => {
         return {
             money: prev.money + totalSale,
             inventory: {
+  // END TRADING: sellAll
+  // =======================
                 ...currentInv,
                 [item]: { count: 0, avg: 0 }
             }
@@ -767,6 +892,9 @@ const buyItem = (item) => {
     // Logic for other types (inventory/defense) stays additive
     if (upgrade.type === 'inventory') setMaxInventory(m => m + upgrade.value);
     // Note: If you have 'defense' items (shields), do you want those to stack? Assuming yes for now.
+  // END TRADING: buyUpgrade
+  // =======================
+
 
     setResources(prev => ({ ...prev, money: prev.money - upgrade.cost }));
     setPlayerItems([...newItems, upgrade]);
@@ -782,6 +910,11 @@ const buyItem = (item) => {
         const amount = Math.min(prev.money, debt);
         
         // Side Effect: Update Debt (Since Debt is its own state, this is safe to do here)
+  // END TRADING: payDebt
+  // =======================
+  // END TRADING METHODS
+  // =======================
+
         setDebt(d => d - amount);
         
         setLog(logPrev => [`Paid ${amount}g loan.`, ...logPrev]);
@@ -814,6 +947,15 @@ const buyItem = (item) => {
         default: return <ShoppingBag size={16} />;
     }
   };
+  // END UTILITIES: getIcon
+  // =======================
+  // END UTILITY METHODS
+  // =======================
+
+
+  // =======================
+  // RENDER METHODS
+  // =======================
 
   // --- RENDER: GAME OVER ---
   if (gameState === 'gameover') {
@@ -822,6 +964,8 @@ const buyItem = (item) => {
             <h1 className="text-5xl font-bold mb-4 text-red-600 flex items-center gap-2"><Skull size={48}/> GAME OVER</h1>
             <div className="bg-slate-900 p-6 rounded-lg border border-slate-700 w-full max-w-sm">
                 <div className="text-2xl mb-2">Final Score</div>
+  // END RENDER: GAME OVER
+  // =======================
                 <div className={`text-4xl font-bold mb-4 ${money - debt >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                     {money - debt}
                 </div>
@@ -859,7 +1003,29 @@ const buyItem = (item) => {
             {!session ? (
                 <button onClick={handleGoogleLogin} className="text-xs bg-white text-black px-3 py-2 rounded font-bold hover:bg-gray-200">G Login</button>
             ) : (
-                <button onClick={handleLogout} className="text-xs text-slate-500 hover:text-white">Logout</button>
+                <div className="relative">
+                    <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 text-slate-400 hover:text-white">
+                        <Menu size={24} />
+                    </button>
+                    
+                    {/* DROPDOWN */}
+                    {menuOpen && (
+                        <div className="absolute right-0 top-10 bg-slate-800 border border-slate-600 rounded shadow-xl w-48 z-50 overflow-hidden">
+                            <button 
+                                onClick={fetchProfile}
+                                className="w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 flex items-center gap-2"
+                            >
+                                <User size={16}/> My Profile
+                            </button>
+                            <button 
+                                onClick={handleLogout}
+                                className="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-slate-700 border-t border-slate-700 flex items-center gap-2"
+                            >
+                                <LogOut size={16}/> Logout
+                            </button>
+                        </div>
+                    )}
+                </div>
             )}
         </div>
 
@@ -1004,6 +1170,73 @@ const buyItem = (item) => {
         )}
         </div>
       </div>
+  // END RENDER: START SCREEN
+  // =======================
+    );
+  }
+  // --- RENDER: PROFILE ---
+  if (gameState === 'profile') {
+    return (
+        <div className="min-h-screen bg-slate-900 text-slate-200 p-4 max-w-md mx-auto border-x border-slate-700">
+            {/* HEADER */}
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold text-yellow-500 flex items-center gap-2">
+                    <User size={24} className="text-yellow-500"/> PLAYER STATS
+                </h1>
+                <button onClick={() => setGameState('start')} className="p-2 bg-slate-800 rounded hover:bg-slate-700">
+                    <X size={20}/>
+                </button>
+            </div>
+
+            {profileData && (
+                <div className="space-y-6">
+                    {/* STATS CARD */}
+                    <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 shadow-lg">
+                        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Lifetime Service</h2>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <div className="text-2xl font-bold text-white">{profileData.stats.totalRuns}</div>
+                                <div className="text-[10px] text-slate-400 uppercase">Runs Attempted</div>
+                            </div>
+                            <div>
+                                <div className="text-2xl font-bold text-yellow-500">{(profileData.stats.totalGold / 1000000).toFixed(1)}M</div>
+                                <div className="text-[10px] text-slate-400 uppercase">Lifetime Profit</div>
+                            </div>
+                            <div>
+                                <div className="text-2xl font-bold text-green-400">{profileData.stats.highestScore.toLocaleString()}</div>
+                                <div className="text-[10px] text-slate-400 uppercase">Personal Best</div>
+                            </div>
+                            <div>
+                                <div className="text-2xl font-bold text-red-500">{profileData.stats.totalDeaths}</div>
+                                <div className="text-[10px] text-slate-400 uppercase">Deaths</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* RECENT HISTORY */}
+                    <div>
+                        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Recent Logs</h2>
+                        <div className="bg-black/30 rounded-lg border border-slate-800 overflow-hidden">
+                            {profileData.history.map((log, i) => (
+                                <div key={i} className="flex justify-between items-center p-3 border-b border-slate-800/50 text-sm">
+                                    <div>
+                                        <div className={`font-bold ${log.score > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                            {log.score.toLocaleString()}
+                                        </div>
+                                        <div className="text-[10px] text-slate-500">
+                                            {log.race} {log.class} • {log.status}
+                                        </div>
+                                    </div>
+                                    <div className="text-right text-[10px] text-slate-600">
+                                        {new Date(log.created_at).toLocaleDateString()}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
   }
 
@@ -1095,10 +1328,10 @@ const buyItem = (item) => {
 
       {activeTab === 'market' ? (
         <>
-      {/* MARKETPLACE */}
-      <div className="mb-4">
-        <div className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
-            {Object.keys(currentPrices).map((item) => {
+          {/* MARKETPLACE */}
+          <div className="mb-4">
+            <div className="bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+                {Object.keys(currentPrices).map((item) => {
                 // 1. Calculate the Buy Multiplier (Charisma)
                 const buyMult = 1.0 - (player.race?.stats.buyMod || 0);
                 
@@ -1122,42 +1355,42 @@ const buyItem = (item) => {
                     />
                 );
             })}
-        </div>
-      </div>
+            </div>
+          </div>
 
-      {/* INVENTORY */}
-      {/* INVENTORY - Dynamic Height */}
-      <div className="mb-2">
-        <div className="flex justify-between items-end mb-1">
-            <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Inventory</h2>
-            <span className="text-[10px] text-slate-400">
-                {Object.values(inventory).reduce((a, b) => a + b.count, 0)} / {maxInventory}
-            </span>
-        </div>
-        
-        <div className="grid grid-cols-4 gap-1 text-center min-h-[3rem]">
-            {Object.entries(inventory).filter(([_, data]) => data.count > 0).length === 0 ? (
-                // EMPTY STATE
-                <div className="col-span-4 flex items-center justify-center text-[10px] text-slate-600 italic border border-slate-800 rounded bg-slate-900/50">
-                    Empty Pockets
-                </div>
-            ) : (
-                // ACTIVE ITEMS ONLY
-                Object.entries(inventory)
-                    .filter(([_, data]) => data.count > 0) // <--- The Filter
-                    .map(([key, data]) => (
-                        <div key={key} className="p-1 rounded border border-slate-700 flex flex-col items-center justify-center bg-slate-800 animate-in zoom-in duration-200">
-                            <div className="text-slate-400 mb-0.5">
-                                {getIcon(key)}
+          {/* INVENTORY */}
+          {/* INVENTORY - Dynamic Height */}
+          <div className="mb-2">
+            <div className="flex justify-between items-end mb-1">
+                <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Inventory</h2>
+                <span className="text-[10px] text-slate-400">
+                    {Object.values(inventory).reduce((a, b) => a + b.count, 0)} / {maxInventory}
+                </span>
+            </div>
+            
+            <div className="grid grid-cols-4 gap-1 text-center min-h-[3rem]">
+                {Object.entries(inventory).filter(([_, data]) => data.count > 0).length === 0 ? (
+                    // EMPTY STATE
+                    <div className="col-span-4 flex items-center justify-center text-[10px] text-slate-600 italic border border-slate-800 rounded bg-slate-900/50">
+                        Empty Pockets
+                    </div>
+                ) : (
+                    // ACTIVE ITEMS ONLY
+                    Object.entries(inventory)
+                        .filter(([_, data]) => data.count > 0) // <--- The Filter
+                        .map(([key, data]) => (
+                            <div key={key} className="p-1 rounded border border-slate-700 flex flex-col items-center justify-center bg-slate-800 animate-in zoom-in duration-200">
+                                <div className="text-slate-400 mb-0.5">
+                                    {getIcon(key)}
+                                </div>
+                                <div className="text-white font-bold text-sm leading-none">
+                                    {data.count}
+                                </div>
                             </div>
-                            <div className="text-white font-bold text-sm leading-none">
-                                {data.count}
-                            </div>
-                        </div>
-                ))
-            )}
-        </div>
-      </div>
+                        ))
+                )}
+            </div>
+          </div>
         </>
       ) : (
         <div className="mb-4 flex-grow">
@@ -1260,9 +1493,16 @@ const buyItem = (item) => {
             </div>
         </div>
       )}
-
+           
     </div>
-  )
+    
+  );
+
+  
+  // END RENDER: MAIN GAME
+  // =======================
+  // END RENDER METHODS
+  // =======================
 }
 
-export default App
+export default App;
