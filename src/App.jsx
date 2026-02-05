@@ -140,6 +140,7 @@ function App() {
   const [combatEvent, setCombatEvent] = useState(null); // { enemy: 'Thief', damage: 30, gold: 500, dc: 12 }
   const [combatStats, setCombatStats] = useState({ wins: 0, losses: 0, flees: 0 });
   const [combatBonus, setCombatBonus] = useState(0);
+  const [dragonsKilled, setDragonsKilled] = useState(0);
 
   // --- ROLL STATE ---
   const [isRolling, setIsRolling] = useState(false);
@@ -183,12 +184,18 @@ function App() {
         score: resources.money - debt,
         status: status,
         days_survived: day,
-        upgrades: playerItems.map(i => i.name), // Just save names
-        combat_stats: combatStats,
+        upgrades: playerItems.map(i => i.name),
+        
+        // NEW: Combine the combatStats state with our new tracker
+        combat_stats: { 
+            ...combatStats, 
+            dragons_killed: dragonsKilled 
+        },
+        
         cause_of_death: cause
     };
 
-    // 2. Send to Supabase (Fire and Forget - don't await)
+    // 2. Send to Supabase
     supabase.from('game_logs').insert([sessionData]).then(({ error }) => {
         if (error) console.error("Telemetry Error:", error);
     });
@@ -214,7 +221,8 @@ function App() {
         totalWins: logs.filter(l => l.score > 0).length,
         highestScore: Math.max(...logs.map(l => l.score), 0),
         dragonsKilled: logs.reduce((acc, l) => acc + (l.combat_stats?.wins || 0), 0), // Approximation if you don't have explicit dragon kill logs yet
-        totalGold: logs.reduce((acc, l) => acc + (l.score > 0 ? l.score : 0), 0)
+        totalGold: logs.reduce((acc, l) => acc + (l.score > 0 ? l.score : 0), 0), 
+        dragonsKilled: logs.reduce((acc, l) => acc + (l.combat_stats?.dragons_killed || 0), 0),
     };
 
     setProfileData({ stats, history: logs.slice(0, 10) }); // Top 10 recent
@@ -403,6 +411,7 @@ function App() {
     setDay(1);
     setCombatBonus(0); 
     setCombatStats({ wins: 0, losses: 0, flees: 0 });
+    setDragonsKilled(0);
     
     // RESET LOCATION & PRICES
     const startLoc = LOCATIONS[0];
@@ -618,6 +627,7 @@ function App() {
           triggerFlash('gold');
           setLog(prev => [`VICTORY! ...`, ...prev]);
           generateLoot(combatEvent.name);
+            if (combatEvent.name === 'Dragon') setDragonsKilled(d => d + 1);
           
           // TRACK WIN
           setCombatStats(prev => ({ ...prev, wins: prev.wins + 1 }));
@@ -1212,6 +1222,15 @@ useEffect(() => { inventoryRef.current = inventory; }, [inventory]);
                             </div>
                         </div>
                     </div>
+
+                    {/* DRAGON HEADS */}
+                            <div className="col-span-2 bg-red-900/20 p-2 rounded border border-red-900/50 flex items-center justify-between px-4">
+                                <div>
+                                    <div className="text-2xl font-bold text-red-500">{profileData.stats.dragonsKilled}</div>
+                                    <div className="text-[10px] text-red-300 uppercase tracking-widest">Dragon Heads</div>
+                                </div>
+                                <Skull size={32} className="text-red-800 opacity-50"/>
+                            </div>
 
                     {/* RECENT HISTORY */}
                     <div>
