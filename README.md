@@ -20,6 +20,7 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 - **Game Session Logging:** All game sessions are logged to the database, including player stats, upgrades acquired, and cause of death for analytics and balance improvements.
 - **Leaderboard:** High scores are saved and displayed using Supabase backend.
 - **Google Authentication:** Log in with Google to save and load characters and scores.
+- **User Profile Page:** View your lifetime statistics including total runs, lifetime profit, personal best score, deaths, dragons killed, and recent game history.
 - **Exit & Restart:** You can now exit the game at any time and restart a new session without reloading the page.
 - **Simulator:** Run automated simulations of thousands of games using the included script to analyze balance and strategies.
 
@@ -72,11 +73,9 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 - **Combat Encounters:** Roll a D20 die with your combat bonus and attempt to defeat enemies. The ScrambleDie animates the outcome.
 - **Pay Debt:** Click on the "Pay" link next to your debt to pay it off.
 - **Save Character:** (If logged in) Save your hero for future runs.
+- **My Profile:** (If logged in) View your lifetime statistics, personal achievements, and recent game history.
 - **Exit/Restart:** Use the in-game option to exit your current run and start over.
 
-## Tech Stack
-
-- **Frontend:** React 19, Vite, Tailwind CSS
 ## Tech Stack
 
 - **Frontend:** React 19, Vite, Tailwind CSS
@@ -84,6 +83,24 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 - **Icons:** lucide-react
 - **Profanity Filtering:** leo-profanity
 - **Dice Rolling:** Custom ScrambleDie component for combat rolls
+
+## Project Structure
+
+The project is organized with a clear separation of concerns:
+
+- **`src/App.jsx`** - Main game logic, state management, and game flow (character creation, trading, combat, profile)
+- **`src/gameData.js`** - Game configuration: races, classes, locations, upgrades, events, and item definitions
+- **`src/components/`** - Reusable React components:
+  - `StatsBar.jsx` - Displays player health, gold, inventory, and active effects
+  - `InventoryGrid.jsx` - Visual inventory management and item display
+  - `MarketItem.jsx` - Individual market item in the trading interface
+  - `ScrambleDie.jsx` - Animated dice roll component for combat encounters
+- **`src/hooks/`** - Custom React hooks:
+  - `useLongPress.js` - Handles long-press interactions for continuous buy/sell actions
+- **`src/utils.jsx`** - Utility functions for icon mapping and other helpers
+- **`src/supabaseClient.js`** - Supabase client configuration and initialization
+- **`scripts/simulate.js`** - Automated game simulation script for balance testing
+- **`scripts/analyze_logs.js`** - Log analysis utility for game statistics
 
 ## Setup & Installation
 
@@ -119,13 +136,6 @@ node scripts/simulate.js
 ```
 
 The simulator will output statistics on win rates, score distribution, and balance for races and classes. You can modify the script to test different strategies or item values.
-
-- `src/App.jsx` - Main game logic and UI
-- `src/gameData.js` - Game data: races, classes, locations, upgrades, events, and item definitions
-- `scripts/simulate.js` - Automated game simulation and balance analysis
-- `src/supabaseClient.js` - Supabase client setup
-- `public/` - Static assets
-- `index.html` - App entry point
 
 ## License
 

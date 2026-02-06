@@ -55,10 +55,13 @@ async function analyze() {
 
     logs.forEach(log => {
         // Status Counts
-        if (log.status === 'Dead') deaths++;
+        // FIX: Check cause_of_death too, because sometimes status is wrong
+        const isDead = log.status === 'Dead' || (log.cause_of_death && log.cause_of_death !== 'Time Limit' && !log.cause_of_death.includes('Quit'));
+        
+        if (isDead) deaths++;
         else if (log.status === 'Bankrupt') bankrupt++;
         else if (log.status.includes('Quit')) quits++;
-        else wins++; // Assuming anything else is a 'Win'
+        else wins++;
 
         // Score (Only count finished games for avg)
         if (!log.status.includes('Quit')) {
@@ -83,6 +86,7 @@ async function analyze() {
         racePerformance[r].runs++;
         racePerformance[r].score += log.score;
         if (log.status === 'Dead') racePerformance[r].deaths++;
+        if (isDead) racePerformance[r].deaths++; // Use the new isDead variable
     });
 
     // --- REPORT ---

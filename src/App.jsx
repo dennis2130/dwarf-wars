@@ -144,8 +144,15 @@ function App() {
     // 2. Calculate Lifetime Stats locally
     const stats = {
         totalRuns: logs.length,
-        totalDeaths: logs.filter(l => l.status === 'Dead').length,
-        totalWins: logs.filter(l => l.score > 0).length,
+        totalDeaths: logs.filter(l => 
+            l.status === 'Dead' || 
+            (l.cause_of_death && l.cause_of_death !== 'Time Limit' && !l.cause_of_death.includes('Quit'))
+        ).length,
+        totalWins: logs.filter(l => 
+            l.score > 0 && 
+            l.status !== 'Dead' && 
+            (!l.cause_of_death || l.cause_of_death === 'Time Limit')
+        ).length,
         highestScore: Math.max(...logs.map(l => l.score), 0),
         totalGold: logs.reduce((acc, l) => acc + (l.score > 0 ? l.score : 0), 0), 
         dragonsKilled: logs.reduce((acc, l) => acc + (l.combat_stats?.dragons_killed || 0), 0),
@@ -361,19 +368,19 @@ function App() {
   // =======================
 
   const triggerGameOver = (cause = null) => {
-    // Determine if dead or just time up
     const isDead = health <= 0;
     const finalScore = resources.money - debt;
     
     let status = 'Win';
-    if (isDead) status = 'Dead';
+    
+    // FIX: If a specific cause (like Dragon) is passed, assume Dead regardless of health state latency
+    if (isDead || (cause && cause !== 'Time Limit')) status = 'Dead';
     else if (finalScore < 0) status = 'Bankrupt';
     
-    // Log it!
     logGameSession(status, cause || (isDead ? 'Unknown' : 'Time Limit'));
 
     setGameState('gameover');
-    saveScore(); // Keep your high score logic too
+    if (status !== 'Dead') saveScore(); // Only save score if they survived
   };
 
 
