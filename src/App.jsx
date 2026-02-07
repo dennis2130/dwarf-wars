@@ -7,6 +7,7 @@ import StartScreen from './screens/StartScreen';
 import GameScreen from './screens/GameScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import GameOverScreen from './screens/GameOverScreen';
+import HelpScreen from './screens/HelpScreen';
 
 function App() {
   // --- STATE ---
@@ -66,7 +67,7 @@ function App() {
 
   // --- DATA FETCHING ---
   const fetchLeaderboard = async () => {
-    const { data } = await supabase.from('high_scores').select('*').order('final_score', { ascending: false }).limit(20);
+    const { data } = await supabase.from('high_scores').select('*').order('final_score', { ascending: false }).limit(100);
     if (data) {
         const clean = data.map(e => validateName(e.player_name) ? { ...e, player_name: "Banned Goblin" } : e);
         setLeaderboard(clean);
@@ -564,10 +565,12 @@ function App() {
         <div className="text-yellow-500 text-xs tracking-[0.5em] font-bold animate-pulse">LOADING REALM...</div>
       </div>
 
-      {gameState === 'start' && <StartScreen player={player} setPlayer={setPlayer} session={session} savedChars={savedChars} leaderboard={leaderboard} onLogin={handleGoogleLogin} onLogout={handleLogout} onStart={startGame} onSave={saveNewCharacter} onDelete={deleteCharacter} onLoad={loadCharacter} onShowProfile={fetchProfile} />}
+      {gameState === 'start' && <StartScreen player={player} setPlayer={setPlayer} session={session} savedChars={savedChars} leaderboard={leaderboard} onLogin={handleGoogleLogin} onLogout={handleLogout} onStart={startGame} onSave={saveNewCharacter} onDelete={deleteCharacter} onLoad={loadCharacter} onShowProfile={fetchProfile} onShowHelp={() => setGameState('help')}  />}
       
       {gameState === 'profile' && <ProfileScreen profileData={profileData} onClose={() => setGameState('start')} />}
       
+      {gameState === 'help' && <HelpScreen onClose={() => setGameState('start')} />}
+
       {gameState === 'gameover' && <GameOverScreen money={resources.money} debt={debt} isSaving={isSaving} onRestart={() => setGameState('start')} />}
       
       {gameState === 'playing' && <GameScreen 

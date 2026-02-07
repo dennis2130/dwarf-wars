@@ -1,14 +1,37 @@
 import { useState } from 'react';
 import { RACES, CLASSES, validateName } from '../gameData'; // Note the ../
-import { Shield, Menu, User, LogOut } from 'lucide-react';
+import { Shield, Menu, User, LogOut, BookOpen } from 'lucide-react';
 
 export default function StartScreen({ 
     player, setPlayer, 
     session, savedChars, leaderboard, 
-    onLogin, onLogout, onStart, onSave, onDelete, onLoad, onShowProfile 
+    onLogin, onLogout, onStart, onSave, onDelete, onLoad, onShowProfile, onShowHelp
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
-    const [showHelp, setShowHelp] = useState(false);
+
+    const [leaderboardTab, setLeaderboardTab] = useState('all'); // 'all', 'month', 'week'
+    
+
+const getFilteredLeaderboard = () => {
+    const now = new Date();
+    const filtered = leaderboard.filter(score => {
+        const scoreDate = new Date(score.created_at);
+        if (leaderboardTab === 'week') {
+            const oneWeekAgo = new Date(now.setDate(now.getDate() - 7));
+            return scoreDate >= oneWeekAgo;
+        }
+        if (leaderboardTab === 'month') {
+            const oneMonthAgo = new Date(now.setMonth(now.getMonth() - 1));
+            return scoreDate >= oneMonthAgo;
+        }
+        return true;
+    });
+    
+    // LIMIT TO TOP 20 HERE
+    return filtered.slice(0, 20); 
+};
+
+const listToRender = [...getFilteredLeaderboard(), ...getFilteredLeaderboard()];
 
     return (
         <div className="min-h-screen bg-slate-900 text-slate-200 p-6 max-w-md mx-auto border-x border-slate-700">
@@ -46,12 +69,25 @@ export default function StartScreen({
                 </div>
             )}
 
-            {/* LEADERBOARD (Auto Scroll) */}
-            <div className="mb-8 bg-black/30 rounded-lg border border-slate-800 h-32 overflow-hidden relative">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest absolute top-0 left-0 right-0 bg-slate-900/90 p-2 z-10 border-b border-slate-800 text-center">Global Leaders</h3>
-                <div className="absolute top-8 left-0 right-0 p-2">
-                    <div className="scrolling-list">
-                        {[...leaderboard, ...leaderboard].map((score, i) => (
+
+            {/* LEADERBOARD CONTAINER */}
+            <div className="mb-8 bg-black/30 rounded-lg border border-slate-800 h-40 relative overflow-hidden">
+                
+                {/* 1. TITLE (Fixed to top of box) */}
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest absolute top-0 left-0 right-0 bg-slate-900/90 p-2 z-10 border-b border-slate-800 text-center">
+                    Global Leaders
+                </h3>
+                {/* LEADERBOARD (Auto Scroll) */}
+                <div className="absolute top-8 left-0 right-0 bg-slate-900/90 z-10 px-2">
+                    <div className="flex text-xs border-b border-slate-800 mb-2">
+                        <button onClick={() => setLeaderboardTab('week')} className={`flex-1 py-1 ${leaderboardTab === 'week' ? 'text-yellow-500 font-bold' : 'text-slate-500'}`}>Week</button>
+                        <button onClick={() => setLeaderboardTab('month')} className={`flex-1 py-1 ${leaderboardTab === 'month' ? 'text-yellow-500 font-bold' : 'text-slate-500'}`}>Month</button>
+                        <button onClick={() => setLeaderboardTab('all')} className={`flex-1 py-1 ${leaderboardTab === 'all' ? 'text-yellow-500 font-bold' : 'text-slate-500'}`}>All Time</button>
+                    </div>
+                </div>
+                <div className="absolute top-16 left-0 right-0 bottom-0 p-2 overflow-hidden">
+                    <div className="scrolling-list" style={{ animationDuration: `${Math.max(20, listToRender.length * .75)}s` }}>
+                            {[...getFilteredLeaderboard(), ...getFilteredLeaderboard()].map((score, i) => (
                             <div key={i} className="flex justify-between text-sm items-center mb-1 border-b border-slate-800/50 pb-1">
                                 <span className="text-slate-400 flex gap-2"><span className="text-slate-600 font-mono w-4">#{i+1}</span> {score.player_name}</span>
                                 <span className={`font-mono ${score.final_score > 0 ? "text-green-500" : "text-red-500"}`}>{score.final_score.toLocaleString()}</span>
@@ -88,16 +124,16 @@ export default function StartScreen({
                 </div>
             </div>
 
-            {/* HELP TOGGLE */}
-            <div className="mt-6 text-center">
-                <button onClick={() => setShowHelp(!showHelp)} className="text-xs text-slate-500 hover:text-yellow-500 underline transition-colors">{showHelp ? "Hide Guide" : "Read Lore & Rules"}</button>
+            {/* HELP BUTTON - RESTYLED */}
+            <div className="mt-6 flex justify-center">
+                <button 
+                    onClick={onShowHelp} 
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-yellow-500/30 rounded-full text-yellow-500 text-xs font-bold uppercase tracking-widest shadow-lg hover:shadow-yellow-500/20 transition-all active:scale-95 animate-pulse"
+                >
+                    <BookOpen size={16} /> 
+                    Read Rules & Lore
+                </button>
             </div>
-            {showHelp && (
-                <div className="mt-4 bg-black/40 rounded-lg p-4 border border-slate-800 text-sm animate-in fade-in slide-in-from-top-4 duration-300">
-                    <div className="mb-4"><h3 className="text-yellow-500 font-bold uppercase mb-2">The Iron Bank Calls</h3><p className="text-slate-400 text-xs italic">"You have 31 Days to turn your measly pocket change into a fortune."</p></div>
-                    <div className="mb-4"><h3 className="text-red-400 font-bold uppercase mb-2">Survival</h3><ul className="text-xs text-slate-400 list-disc list-inside"><li>Combat: Pay or Fight.</li><li>Bleed: Heal if HP &lt; 25%.</li></ul></div>
-                </div>
-            )}
         </div>
     );
 }

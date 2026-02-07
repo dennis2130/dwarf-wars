@@ -13,7 +13,9 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 - **Inventory & Upgrades:** Manage your inventory space and purchase upgrades (Pack Mule, Wagon, weapons, and consumables) to increase carrying capacity, boost combat skills, or heal. New items and upgrades are available for purchase as you progress.
 - **Combat System:** Engage in dice-roll based combat encounters using the ScrambleDie mechanic. Purchase weapons (Dagger, Steel Sword, Mithril Axe) to increase your combat bonus and defeat enemies. Critical Successes (Nat 20s) deliver devastating blows with flavor text, while Critical Failures (Nat 1s) result in dramatic negative outcomes such as burnt inventory, maiming, or dragon fire.
 - **Consumables:** Use special items like the Elixir of Life to restore health during your adventure.
-- **Health & Survival:** Monitor your health and combat ability. If your health drops to zero, it's game over!
+- **Health & Survival:** Monitor your health and combat ability. If your health drops to zero, it's game over! Beware the **Bleed** mechanic: when your health drops below 25%, you take damage every time you travel.
+- **Debt Interest:** Your debt compounds at 5% interest daily, so paying it off quickly is crucial to maximizing your final score.
+- **Taxation Mechanic:** If your net worth exceeds 1 million gold, the City Watch will pursue you, triggering guard encounters.
 - **Debt System:** Start with a debt based on your class. Pay it off before the end of 31 days to maximize your score.
 - **Profanity Filtering:** Character names are validated against a profanity filter to keep the leaderboard clean.
 - **Smart Max Button:** Intelligently buy or sell the maximum amount of an item based on your gold, inventory space, and stock availability.
@@ -75,6 +77,7 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 - **Save Character:** (If logged in) Save your hero for future runs.
 - **My Profile:** (If logged in) View your lifetime statistics, personal achievements, and recent game history.
 - **Exit/Restart:** Use the in-game option to exit your current run and start over.
+- **Help/Guide:** Click the Help button to view the in-game guide explaining races, classes, controls, and advanced mechanics like Bleed and Guard encounters.
 
 ## Tech Stack
 
@@ -95,6 +98,7 @@ The project is organized with a clear separation of concerns:
   - `GameScreen.jsx` - Main gameplay screen with trading and adventure mechanics
   - `ProfileScreen.jsx` - User profile and lifetime statistics
   - `GameOverScreen.jsx` - Game over and score display
+  - `HelpScreen.jsx` - In-game help and game guide displaying races, classes, and mechanicsexplanations
 - **`src/components/`** - Reusable React components:
   - `StatsBar.jsx` - Displays player health, gold, inventory, and active effects
   - `InventoryGrid.jsx` - Visual inventory management and item display
