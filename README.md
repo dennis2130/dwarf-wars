@@ -9,9 +9,9 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 - **Character Creation:** Choose your name, race (Human, Dwarf, Elf, Orc), and class (Merchant, Rogue, Warrior), each with unique bonuses and starting stats.
 - **Trading System:** Buy and sell a variety of items (rations, ale, potions, tools, scrolls, gems) at fluctuating prices across different locations.
 - **Dynamic Locations:** Travel between unique locations (Royal City, Goblin Slums, Elven Forest, Iron Forge, Orc Badlands), each with their own price modifiers and risk levels.
-- **Random Events:** Encounter random events like dragon attacks, theft, blessings, and market crashes that affect your health, gold, or prices.
+- **Random Events:** Encounter random events including dragon attacks, encounters with city watch, goblin pickpockets, merchant blessings, found treasure, market crashes, and price surges that affect your health, gold, or prices.
 - **Inventory & Upgrades:** Manage your inventory space and purchase upgrades (Pack Mule, Wagon, weapons, and consumables) to increase carrying capacity, boost combat skills, or heal. New items and upgrades are available for purchase as you progress.
-- **Combat System:** Engage in dice-roll based combat encounters using the ScrambleDie mechanic. Purchase weapons (Dagger, Steel Sword, Mithril Axe) to increase your combat bonus and defeat enemies.
+- **Combat System:** Engage in dice-roll based combat encounters using the ScrambleDie mechanic. Purchase weapons (Dagger, Steel Sword, Mithril Axe) to increase your combat bonus and defeat enemies. Critical Successes (Nat 20s) deliver devastating blows with flavor text, while Critical Failures (Nat 1s) result in dramatic negative outcomes such as burnt inventory, maiming, or dragon fire.
 - **Consumables:** Use special items like the Elixir of Life to restore health during your adventure.
 - **Health & Survival:** Monitor your health and combat ability. If your health drops to zero, it's game over!
 - **Debt System:** Start with a debt based on your class. Pay it off before the end of 31 days to maximize your score.
@@ -88,15 +88,20 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 
 The project is organized with a clear separation of concerns:
 
-- **`src/App.jsx`** - Main game logic, state management, and game flow (character creation, trading, combat, profile)
+- **`src/App.jsx`** - Main application entry point and state management
 - **`src/gameData.js`** - Game configuration: races, classes, locations, upgrades, events, and item definitions
+- **`src/screens/`** - Main screen components for different game states:
+  - `StartScreen.jsx` - Character creation and hero selection
+  - `GameScreen.jsx` - Main gameplay screen with trading and adventure mechanics
+  - `ProfileScreen.jsx` - User profile and lifetime statistics
+  - `GameOverScreen.jsx` - Game over and score display
 - **`src/components/`** - Reusable React components:
   - `StatsBar.jsx` - Displays player health, gold, inventory, and active effects
   - `InventoryGrid.jsx` - Visual inventory management and item display
   - `MarketItem.jsx` - Individual market item in the trading interface
   - `ScrambleDie.jsx` - Animated dice roll component for combat encounters
 - **`src/hooks/`** - Custom React hooks:
-  - `useLongPress.js` - Handles long-press interactions for continuous buy/sell actions
+  - `useLongPress.js` - Handles long-press interactions for continuous buy/sell actions with global event listeners to properly detect finger/mouse lift anywhere on screen
 - **`src/utils.jsx`** - Utility functions for icon mapping and other helpers
 - **`src/supabaseClient.js`** - Supabase client configuration and initialization
 - **`scripts/simulate.js`** - Automated game simulation script for balance testing

@@ -90,11 +90,27 @@ export const UPGRADES = [
 
 export const EVENTS = [
   { id: 'dragon', text: "A Dragon attacks!", type: 'damage', value: 30 },
-  { id: 'mugger', text: "A thief bumps into you.", type: 'theft', value: 0.10 },
-  { id: 'healer', text: "A cleric blesses you.", type: 'heal', value: 25 },
+  { 
+    id: 'mugger', 
+    text: "Spin the Goblin bumps into you!", 
+    type: 'theft', 
+    value: 0.10 
+  },
+    { 
+    id: 'healer', 
+    text: "Johann the Cleric blesses your journey.", 
+    type: 'heal', 
+    value: 25 
+  },
   { id: 'find',   text: "You find a coin purse.", type: 'money', value: 200 },
   { id: 'sale',   text: "Market Crash!", type: 'price', value: 0.5 },
-  { id: 'riot',   text: "Riots! Prices high.", type: 'price', value: 2.0 }
+  { id: 'riot',   text: "Riots! Prices high.", type: 'price', value: 2.0 },
+    { 
+    id: 'guards', 
+    text: "The City Watch recognizes you!", 
+    type: 'guard_encounter', 
+    value: 0 // Value calculates dynamically based on wealth
+  },
 ];
 
 import filter from 'leo-profanity';
