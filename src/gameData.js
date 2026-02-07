@@ -111,6 +111,11 @@ export const EVENTS = [
     type: 'guard_encounter', 
     value: 0 // Value calculates dynamically based on wealth
   },
+{ id: 'rain', text: "A heavy rainstorm slows your travel.", type: 'flavor', value: 0 },
+  { id: 'bards', text: "A troupe of bards sings of your exploits.", type: 'flavor', value: 0 },
+  { id: 'ruins', text: "You pass ancient dwarven ruins.", type: 'flavor', value: 0 },
+  { id: 'wolf', text: "You hear a wolf howl in the distance.", type: 'flavor', value: 0 },
+  { id: 'cart', text: "You fix a broken wheel on your cart.", type: 'flavor', value: 0 }
 ];
 
 import filter from 'leo-profanity';

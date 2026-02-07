@@ -203,10 +203,9 @@ function App() {
     }, 0);
     const netWorth = resources.money + inventoryValue;
 
-    // WANTED LOGIC: If rich (> 500k), add Guards to the pool multiple times to increase odds
-    if (netWorth > 500000) {
+    // WANTED LOGIC: If rich (> 1.5mil), add Guards to the pool multiple times to increase odds
+    if (netWorth > 1500000) {
         eventPool.push(EVENTS.find(e => e.id === 'guards'));
-        eventPool.push(EVENTS.find(e => e.id === 'guards')); // Double chance
     }
 
     const event = eventPool[Math.floor(Math.random() * eventPool.length)];
@@ -247,6 +246,11 @@ function App() {
         case 'heal': setHealth(h => Math.min(h + event.value, maxHealth)); triggerFlash('green'); msg += ` (+${event.value} HP)`; break;
         case 'money': updateMoney(event.value); triggerFlash('gold'); msg += ` (+${event.value} G)`; break;
         case 'price': eventPriceMod = event.value; break;
+                case 'flavor': 
+            // Do nothing, just show text. 
+            // Maybe heal 1 HP for a peaceful day?
+            setHealth(h => Math.min(h + 1, maxHealth));
+            break;
         default: break;
     }
     setEventMsg({ text: msg, type: event.type });

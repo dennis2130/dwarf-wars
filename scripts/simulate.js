@@ -1,4 +1,3 @@
-// scripts/simulate.js
 import { RACES, CLASSES, LOCATIONS, EVENTS, UPGRADES, BASE_PRICES } from '../src/gameData.js';
 
 const SIMULATION_RUNS = 10000;
@@ -13,7 +12,8 @@ let globalStats = {
     classStats: {},
     deaths: 0,
     bankruptcies: 0,
-    dragonsKilled: 0
+    dragonsKilled: 0,
+    guardsEncountered: 0 // New Metric
 };
 
 function runSingleGame(race, charClass) {
@@ -28,7 +28,7 @@ function runSingleGame(race, charClass) {
         maxHealth: 100 + race.stats.health,
         health: 100 + race.stats.health,
         combatBonus: (race.stats.combat || 0),
-        priceMod: 1.0 // Simplified for sim (Buy/Sell mods average out to ~1.0 impact on profit margin)
+        priceMod: 1.0 
     };
 
     const recalcPrices = (loc) => {
@@ -46,7 +46,6 @@ function runSingleGame(race, charClass) {
     while (state.day < MAX_DAYS && state.health > 0) {
         
         // --- 1. SURVIVAL CHECK ---
-        // If critical (Bleed threshold is 25%), buy health immediately
         if (state.health < state.maxHealth * 0.35) {
             const cost = 500; 
             if (state.money >= cost) {
@@ -55,8 +54,8 @@ function runSingleGame(race, charClass) {
             }
         }
 
-        // --- 2. TRADING ---
-        // Sell High
+        // --- 2. TRADING (Simplified Greedy Bot) ---
+        // Sell
         for (const item in state.inventory) {
             if (state.inventory[item] > 0) {
                 if (state.prices[item] > BASE_PRICES[item] * 1.2 || state.day === MAX_DAYS) {
@@ -65,8 +64,7 @@ function runSingleGame(race, charClass) {
                 }
             }
         }
-
-        // Buy Low
+        // Buy
         const currentItems = Object.values(state.inventory).reduce((a, b) => a + b, 0);
         let space = state.maxInventory - currentItems;
         if (space > 0) {
@@ -76,9 +74,8 @@ function runSingleGame(race, charClass) {
 
             for (let deal of deals) {
                 if (space <= 0) break;
-                // Reserve 1000g for emergencies
-                if (deal.ratio < 0.8 && state.money >= deal.price + 1000) {
-                    const canAfford = Math.floor((state.money - 1000) / deal.price);
+                if (deal.ratio < 0.8 && state.money >= deal.price + 2000) { // Increased reserve for bribes
+                    const canAfford = Math.floor((state.money - 2000) / deal.price);
                     const buyAmount = Math.min(space, canAfford);
                     state.inventory[deal.id] += buyAmount;
                     state.money -= buyAmount * deal.price;
@@ -88,7 +85,7 @@ function runSingleGame(race, charClass) {
         }
 
         // --- 3. UPGRADES ---
-        if (state.money > 5000 && state.combatBonus < 5) {
+        if (state.money > 8000 && state.combatBonus < 5) {
             state.money -= 2000;
             state.combatBonus += 5; // Buy Sword
         }
@@ -108,25 +105,82 @@ function runSingleGame(race, charClass) {
         while (nextLoc.name === state.location.name);
         state.location = nextLoc;
         
-        // Combat
+        // --- EVENT LOGIC (UPDATED) ---
         if (Math.random() <= nextLoc.risk) {
-            const eventRoll = Math.random();
-            if (eventRoll < 0.3) {
-                const isDragon = Math.random() > 0.8;
-                const difficulty = isDragon ? 18 : 10;
-                const damage = isDragon ? 60 : 20;
-                
-                const roll = Math.ceil(Math.random() * 20);
-                const total = roll + state.combatBonus;
+            // 1. Calculate Net Worth for Guards
+            const invVal = Object.keys(state.inventory).reduce((sum, k) => sum + (state.inventory[k] * state.prices[k]), 0);
+            const netWorth = state.money + invVal;
 
-                if (total >= difficulty) {
-                    state.money += isDragon ? 1000 : 200; 
-                    if (isDragon) globalStats.dragonsKilled++;
+            let eventPool = [...EVENTS];
+            if (netWorth > 500000) {
+                // Add Guards to pool (Simulation of probability)
+                eventPool.push({ id: 'guards', type: 'guard_encounter', text: 'Sim Guard' });
+                eventPool.push({ id: 'guards', type: 'guard_encounter', text: 'Sim Guard' });
+            }
+
+            const event = eventPool[Math.floor(Math.random() * eventPool.length)];
+
+            // COMBAT
+            if (event.type === 'damage' || event.type === 'theft' || event.type === 'guard_encounter') {
+                if (event.id === 'guards') globalStats.guardsEncountered++;
+
+                let dmg = 20, diff = 10, goldLoss = 0;
+                if (event.id === 'dragon') { dmg = 60; diff = 18; }
+                else if (event.id === 'mugger') { dmg = 20; diff = 12; goldLoss = 0.10; }
+                else if (event.id === 'guards') { dmg = 30; diff = 14; goldLoss = 0.25; }
+
+                // Bot Logic: Pay or Fight?
+                // Fight if we have decent odds (need a 10 or better on dice) OR if paying is too expensive
+                const rollNeeded = diff - state.combatBonus;
+                const winChance = (21 - rollNeeded) / 20;
+                const costToPay = goldLoss > 0 ? state.money * goldLoss : 0;
+                
+                // Fight if > 60% win chance OR if paying costs > 10k gold (greedy bot)
+                if (winChance > 0.6 || costToPay > 10000 || event.id === 'dragon') {
+                    // FIGHT
+                    const d20 = Math.ceil(Math.random() * 20);
+                    const total = d20 + state.combatBonus;
+
+                    if (d20 === 20) {
+                        // CRIT SUCCESS
+                        state.money += 500; // Simulating loot
+                        if (event.id === 'dragon') globalStats.dragonsKilled++;
+                    } else if (d20 === 1) {
+                        // CRIT FAIL (Simulate average punishment)
+                        if (event.id === 'dragon') {
+                            // Burn 50% inv
+                            Object.keys(state.inventory).forEach(k => state.inventory[k] = Math.floor(state.inventory[k] / 2));
+                            state.health -= 20;
+                        } else if (event.id === 'guards') {
+                            // Civil Forfeiture
+                            state.money = Math.floor(state.money * 0.5);
+                            state.health -= 20;
+                        } else {
+                            // Mugged
+                            state.money = Math.floor(state.money * 0.5);
+                        }
+                    } else if (total >= diff) {
+                        // NORMAL WIN
+                        state.money += 200; // Loot
+                        if (event.id === 'dragon') globalStats.dragonsKilled++;
+                    } else {
+                        // NORMAL LOSS
+                        state.health -= dmg;
+                        if (goldLoss > 0) state.money -= Math.floor(state.money * goldLoss);
+                    }
                 } else {
-                    state.health -= damage;
+                    // PAY / RUN
+                    if (goldLoss > 0) {
+                        state.money -= Math.floor(state.money * goldLoss);
+                    } else {
+                        state.health -= Math.floor(dmg / 2);
+                    }
                 }
             }
-            else if (eventRoll < 0.4) state.money += 200;
+            else if (event.type === 'money') state.money += 200;
+            else if (event.type === 'heal') state.health = Math.min(state.health + 25, state.maxHealth);
+            else if (event.type === 'price') state.priceMod *= event.value;
+            else if (event.type === 'flavor') state.health = Math.min(state.health + 1, state.maxHealth); // Peaceful day, small heal
         }
         recalcPrices(nextLoc);
     }
@@ -146,22 +200,15 @@ for (let i = 0; i < SIMULATION_RUNS; i++) {
 
     globalStats.runs++;
     
-    // TRACKING
-    if (result.dead) {
-        globalStats.deaths++;
-    } else {
+    if (result.dead) globalStats.deaths++;
+    else {
         globalStats.totalScore += result.score;
         globalStats.scores.push(result.score);
-        
-        if (result.score > 0) globalStats.wins++;
-        else globalStats.bankruptcies++;
-
+        if (result.score > 0) globalStats.wins++; else globalStats.bankruptcies++;
         if (result.score > globalStats.highestScore) globalStats.highestScore = result.score;
         if (result.score < globalStats.lowestScore) globalStats.lowestScore = result.score;
     }
 
-    // Race/Class Balance
-    // We track avg score regardless of death (dead = 0 score contribution basically) to see viability
     if (!globalStats.raceStats[r.name]) globalStats.raceStats[r.name] = { runs: 0, total: 0, deaths: 0 };
     globalStats.raceStats[r.name].runs++;
     if (result.dead) globalStats.raceStats[r.name].deaths++;
@@ -184,17 +231,17 @@ console.log(`Total Runs: ${globalStats.runs}`);
 console.log(`Survivors:  ${globalStats.runs - globalStats.deaths} (${((1 - globalStats.deaths/globalStats.runs)*100).toFixed(1)}%)`);
 console.log(`Deaths:     ${globalStats.deaths} (${((globalStats.deaths/globalStats.runs)*100).toFixed(1)}%)`);
 console.log(`Dragons:    ${globalStats.dragonsKilled} killed`);
+console.log(`Guards:     ${globalStats.guardsEncountered} encounters`);
 console.log("\n--- SCORE (Survivors Only) ---");
 console.log(`Highest:    ${globalStats.highestScore.toLocaleString()}`);
 console.log(`Median:     ${median.toLocaleString()}`);
 console.log(`Lowest:     ${globalStats.lowestScore.toLocaleString()}`);
 
 console.log("\n--- BALANCE: RACES ---");
-// Calculates Avg Score of SURVIVORS, but shows Death Rate
 const raceBal = Object.entries(globalStats.raceStats)
     .map(([key, data]) => ({ 
         race: key, 
-        avg_score: Math.floor(data.total / (data.runs - data.deaths)).toLocaleString(), 
+        avg_score: data.runs - data.deaths > 0 ? Math.floor(data.total / (data.runs - data.deaths)).toLocaleString() : 0, 
         death_rate: ((data.deaths / data.runs) * 100).toFixed(1) + '%'
     }))
     .sort((a, b) => parseInt(b.avg_score.replace(/,/g,'')) - parseInt(a.avg_score.replace(/,/g,'')));
@@ -204,7 +251,7 @@ console.log("\n--- BALANCE: CLASSES ---");
 const classBal = Object.entries(globalStats.classStats)
     .map(([key, data]) => ({ 
         class: key, 
-        avg_score: Math.floor(data.total / (data.runs - data.deaths)).toLocaleString(), 
+        avg_score: data.runs - data.deaths > 0 ? Math.floor(data.total / (data.runs - data.deaths)).toLocaleString() : 0, 
         death_rate: ((data.deaths / data.runs) * 100).toFixed(1) + '%'
     }))
     .sort((a, b) => parseInt(b.avg_score.replace(/,/g,'')) - parseInt(a.avg_score.replace(/,/g,'')));
