@@ -20,7 +20,7 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 - **Profanity Filtering:** Character names are validated against a profanity filter to keep the leaderboard clean.
 - **Smart Max Button:** Intelligently buy or sell the maximum amount of an item based on your gold, inventory space, and stock availability.
 - **Game Session Logging:** All game sessions are logged to the database, including player stats, upgrades acquired, and cause of death for analytics and balance improvements.
-- **Leaderboard:** High scores are saved and displayed using Supabase backend.
+- **Dynamic Leaderboard:** High scores are saved and displayed with multiple time-period filters: Daily (past 24 hours), Weekly (past 7 days), Monthly (past 30 days), and All Time rankings using Supabase backend.
 - **Google Authentication:** Log in with Google to save and load characters and scores.
 - **User Profile Page:** View your lifetime statistics including total runs, lifetime profit, personal best score, deaths, dragons killed, and recent game history.
 - **Exit & Restart:** You can now exit the game at any time and restart a new session without reloading the page.
@@ -74,6 +74,11 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 - **Travel Button:** Move to a new location and trigger events.
 - **Combat Encounters:** Roll a D20 die with your combat bonus and attempt to defeat enemies. The ScrambleDie animates the outcome.
 - **Pay Debt:** Click on the "Pay" link next to your debt to pay it off.
+- **Leaderboard Filters:** On the start screen, view the global leaderboard filtered by time period:
+  - **Today:** Top scores from the past 24 hours
+  - **Week:** Top scores from the past 7 days
+  - **Month:** Top scores from the past 30 days
+  - **All Time:** Top scores since the game launched
 - **Save Character:** (If logged in) Save your hero for future runs.
 - **My Profile:** (If logged in) View your lifetime statistics, personal achievements, and recent game history.
 - **Exit/Restart:** Use the in-game option to exit your current run and start over.

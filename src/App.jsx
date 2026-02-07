@@ -67,7 +67,7 @@ function App() {
 
   // --- DATA FETCHING ---
   const fetchLeaderboard = async () => {
-    const { data } = await supabase.from('high_scores').select('*').order('final_score', { ascending: false }).limit(100);
+    const { data } = await supabase.from('high_scores').select('*').order('final_score', { ascending: false }).limit(500);
     if (data) {
         const clean = data.map(e => validateName(e.player_name) ? { ...e, player_name: "Banned Goblin" } : e);
         setLeaderboard(clean);

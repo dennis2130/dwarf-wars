@@ -9,13 +9,17 @@ export default function StartScreen({
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
 
-    const [leaderboardTab, setLeaderboardTab] = useState('all'); // 'all', 'month', 'week'
+    const [leaderboardTab, setLeaderboardTab] = useState('day'); // 'all', 'month', 'week', 'day'
     
 
 const getFilteredLeaderboard = () => {
     const now = new Date();
     const filtered = leaderboard.filter(score => {
         const scoreDate = new Date(score.created_at);
+        if (leaderboardTab === 'day') {
+            const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            return scoreDate >= oneDayAgo;
+        }
         if (leaderboardTab === 'week') {
             const oneWeekAgo = new Date(now.setDate(now.getDate() - 7));
             return scoreDate >= oneWeekAgo;
@@ -80,6 +84,7 @@ const listToRender = [...getFilteredLeaderboard(), ...getFilteredLeaderboard()];
                 {/* LEADERBOARD (Auto Scroll) */}
                 <div className="absolute top-8 left-0 right-0 bg-slate-900/90 z-10 px-2">
                     <div className="flex text-xs border-b border-slate-800 mb-2">
+                        <button onClick={() => setLeaderboardTab('day')} className={`flex-1 py-1 ${leaderboardTab === 'day' ? 'text-yellow-500 font-bold' : 'text-slate-500'}`}>Today</button>
                         <button onClick={() => setLeaderboardTab('week')} className={`flex-1 py-1 ${leaderboardTab === 'week' ? 'text-yellow-500 font-bold' : 'text-slate-500'}`}>Week</button>
                         <button onClick={() => setLeaderboardTab('month')} className={`flex-1 py-1 ${leaderboardTab === 'month' ? 'text-yellow-500 font-bold' : 'text-slate-500'}`}>Month</button>
                         <button onClick={() => setLeaderboardTab('all')} className={`flex-1 py-1 ${leaderboardTab === 'all' ? 'text-yellow-500 font-bold' : 'text-slate-500'}`}>All Time</button>
