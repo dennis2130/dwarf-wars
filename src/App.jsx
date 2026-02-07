@@ -197,7 +197,9 @@ function App() {
 
     // Calculate Net Worth
     const inventoryValue = Object.keys(resources.inventory).reduce((total, item) => {
-        return total + (resources.inventory[item].count * currentPrices[item]);
+        const count = resources.inventory[item]?.count || 0;
+        const price = currentPrices[item] || 0;
+        return total + (count * price);
     }, 0);
     const netWorth = resources.money + inventoryValue;
 
