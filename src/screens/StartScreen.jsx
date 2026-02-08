@@ -5,7 +5,7 @@ import { Shield, Menu, User, LogOut, BookOpen } from 'lucide-react';
 export default function StartScreen({ 
     player, setPlayer, 
     session, savedChars, leaderboard, 
-    onLogin, onLogout, onStart, onSave, onDelete, onLoad, onShowProfile, onShowHelp
+    onLogin, onLogout, onStart, onSave, onDelete, onLoad, onShowProfile, onShowHelp, userProfile
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
 
@@ -45,14 +45,21 @@ const listToRender = [...getFilteredLeaderboard(), ...getFilteredLeaderboard()];
                 {!session ? (
                     <button onClick={onLogin} className="text-xs bg-white text-black px-3 py-2 rounded font-bold hover:bg-gray-200">G Login</button>
                 ) : (
-                    <div className="relative">
-                        <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 text-slate-400 hover:text-white"><Menu size={24} /></button>
-                        {menuOpen && (
-                            <div className="absolute right-0 top-10 bg-slate-800 border border-slate-600 rounded shadow-xl w-48 z-50 overflow-hidden">
-                                <button onClick={onShowProfile} className="w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 flex items-center gap-2"><User size={16}/> My Profile</button>
-                                <button onClick={onLogout} className="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-slate-700 border-t border-slate-700 flex items-center gap-2"><LogOut size={16}/> Logout</button>
-                            </div>
-                        )}
+                    <div className="flex items-center gap-3">
+                        {/* SHOW TAG HERE */}
+                        <div className="text-right hidden sm:block">
+                            <div className="text-[10px] text-slate-400 uppercase">Player</div>
+                            <div className="text-xs font-bold text-yellow-500">{userProfile?.gamertag}</div>
+                        </div>
+                        <div className="relative">
+                            <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 text-slate-400 hover:text-white"><Menu size={24} /></button>
+                            {menuOpen && (
+                                <div className="absolute right-0 top-10 bg-slate-800 border border-slate-600 rounded shadow-xl w-48 z-50 overflow-hidden">
+                                    <button onClick={onShowProfile} className="w-full text-left px-4 py-3 text-sm text-slate-200 hover:bg-slate-700 flex items-center gap-2"><User size={16}/> My Profile</button>
+                                    <button onClick={onLogout} className="w-full text-left px-4 py-3 text-sm text-red-400 hover:bg-slate-700 border-t border-slate-700 flex items-center gap-2"><LogOut size={16}/> Logout</button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
@@ -93,9 +100,14 @@ const listToRender = [...getFilteredLeaderboard(), ...getFilteredLeaderboard()];
                 <div className="absolute top-16 left-0 right-0 bottom-0 p-2 overflow-hidden">
                     <div className="scrolling-list" style={{ animationDuration: `${Math.max(20, listToRender.length * .75)}s` }}>
                             {[...getFilteredLeaderboard(), ...getFilteredLeaderboard()].map((score, i) => (
+                                
                             <div key={i} className="flex justify-between text-sm items-center mb-1 border-b border-slate-800/50 pb-1">
-                                <span className="text-slate-400 flex gap-2"><span className="text-slate-600 font-mono w-4">#{i+1}</span> {score.player_name}</span>
-                                <span className={`font-mono ${score.final_score > 0 ? "text-green-500" : "text-red-500"}`}>{score.final_score.toLocaleString()}</span>
+                                <span className="text-slate-400 flex gap-2">
+                                    <span className="text-slate-600 font-mono w-4">#{i+1}</span> 
+                                    {score.gamertag || score.player_name}</span>
+                                    <span className="text-slate-600 text-[10px]">({score.race} {score.class})</span>
+                                    <span className={`font-mono ${score.final_score > 0 ? "text-green-500" : "text-red-500"}`}>{score.final_score.toLocaleString()}</span>
+                                
                             </div>
                         ))}
                     </div>

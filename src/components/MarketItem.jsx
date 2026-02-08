@@ -1,47 +1,78 @@
 import { useLongPress } from '../hooks/useLongPress';
 
-export default function MarketItem({ item, price, myAvg, haveStock, onBuy, onSell, onSmartMax, icon }) {
-    let priceColor = "text-yellow-500";
+export default function MarketItem({ item, buyPrice, sellPrice, myAvg, haveStock, onBuy, onSell, onBuyMax, onSellAll, icon }) {
+    
+    // Profit Calculation for Sell Price Color
+    let sellColor = "text-slate-400";
     if (haveStock) {
-        if (price > myAvg) priceColor = "text-green-400"; 
-        if (price < myAvg) priceColor = "text-red-400";   
+        if (sellPrice > myAvg) sellColor = "text-green-400"; // Profit
+        else if (sellPrice < myAvg) sellColor = "text-red-400"; // Loss
     }
 
     const buyEvents = useLongPress(onBuy);
     const sellEvents = useLongPress(onSell);
 
     return (
-        <div className="flex justify-between items-center p-2 border-b border-slate-700 last:border-0 h-14">
-            <div className="w-1/3 min-w-0">
-                <div className="font-bold text-slate-300 flex items-center gap-2 capitalize truncate">
-                    {icon} <span className="truncate">{item}</span>
+        <div className="flex items-center justify-between py-2 border-b border-slate-700/50 h-18">
+            
+            {/* LEFT: Name & Stats */}
+            <div className="flex flex-col w-28 shrink-0 mr-2">
+                {/* Name */}
+                <div className="font-bold text-slate-100 text-sm truncate flex items-center gap-2 mb-1">
+                    {icon} <span>{item}</span>
                 </div>
-                {haveStock && (
-                    <div className="text-[10px] text-slate-500">
-                        Avg: {Math.floor(myAvg)}g
-                    </div>
-                )}
-            </div>
-            
-            <div className={`w-1/4 text-center font-mono text-sm ${priceColor}`}>
-                {price} g
-            </div>
-            
-            <div className="flex-1 flex justify-end gap-1">
-                <button {...buyEvents} className="bg-green-700 hover:bg-green-600 px-3 py-2 rounded text-xs font-bold active:scale-95 transition-transform select-none text-white">
-                    Buy
-                </button>
-                <button {...sellEvents} className="bg-red-700 hover:bg-red-600 px-3 py-2 rounded text-xs font-bold active:scale-95 transition-transform select-none text-white">
-                    Sell
-                </button>
                 
-                <button 
-                    onClick={onSmartMax} 
-                    className="bg-blue-600 hover:bg-blue-500 px-2 py-2 rounded text-xs font-bold border border-blue-500 active:scale-95 transition-transform text-white" 
-                    title="Smart Max"
-                >
-                    MAX
-                </button>
+                {/* Prices Stacked - Increased Visibility */}
+                <div className="flex flex-col text-xs font-mono leading-tight gap-1">
+                    <div className="flex justify-between w-full items-center">
+                        <span className="text-slate-500 text-[10px] uppercase">Buy</span>
+                        <span className="text-white font-bold text-sm">{buyPrice}</span>
+                    </div>
+                    <div className="flex justify-between w-full items-center">
+                        <span className="text-slate-500 text-[10px] uppercase">Sell</span>
+                        <span className={`font-bold text-sm ${sellColor}`}>{sellPrice}</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* RIGHT: Button Clusters */}
+            <div className="flex flex-1 justify-end gap-3">
+                
+                {/* BUY GROUP */}
+                <div className="flex shadow-sm">
+                    <button 
+                        onClick={onBuyMax}
+                        className="bg-green-600 hover:bg-green-500 text-white px-3 rounded-l text-xs font-bold active:scale-95 transition-all shadow-green-900/20 shadow-lg border-y border-l border-green-500"
+                        title="Buy Max"
+                    >
+                        MAX
+                    </button>
+                    <button 
+                        {...buyEvents}
+                        className="bg-slate-800 hover:bg-slate-700 text-green-500 border border-green-700/50 px-3 py-2 rounded-r text-[10px] font-bold uppercase active:scale-95 transition-all"
+                        title="Buy One"
+                    >
+                        Buy
+                    </button>
+                </div>
+
+                {/* SELL GROUP */}
+                <div className="flex shadow-sm">
+                    <button 
+                        {...sellEvents}
+                        className="bg-slate-800 hover:bg-slate-700 text-red-500 border border-red-900/50 px-3 py-2 rounded-l text-[10px] font-bold uppercase active:scale-95 transition-all"
+                        title="Sell One"
+                    >
+                        Sell
+                    </button>
+                    <button 
+                        onClick={onSellAll}
+                        className="bg-red-600 hover:bg-red-500 text-white px-3 rounded-r text-xs font-bold active:scale-95 transition-all shadow-red-900/20 shadow-lg border-y border-r border-red-500"
+                        title="Sell All"
+                    >
+                        ALL
+                    </button>
+                </div>
             </div>
         </div>
     );

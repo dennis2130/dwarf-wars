@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Map, RotateCcw, LogOut, Shield, ShoppingBag, Hammer, Sword, FlaskConical  } from 'lucide-react';
+import { Map, RotateCcw, LogOut, Shield, ShoppingBag, Sword, FlaskConical  } from 'lucide-react';
 import StatsBar from '../components/StatsBar';
 import InventoryGrid from '../components/InventoryGrid';
 import MarketItem from '../components/MarketItem';
@@ -9,10 +9,10 @@ import { UPGRADES } from '../gameData';
 
 export default function GameScreen({ 
     player, day, maxDays, location, resources, health, maxHealth, debt, 
-    currentPrices, priceMod, log, eventMsg, flash, combatEvent, isRolling, rollTarget,
+    currentPrices, log, eventMsg, flash, combatEvent, isRolling, rollTarget,
     playerItems, onPayDebt, onTravel, onRestart, onQuit, 
-    onBuy, onSell, onSmartMax, onBuyUpgrade, 
-    combatActions, hasTraded, onWork
+    onBuy, onSell, onBuyMax, onSellAll, onBuyUpgrade, getBuyPrice, getSellPrice,
+    combatActions, hasTraded 
 }) {
     const [activeTab, setActiveTab] = useState('market');
 
@@ -43,13 +43,25 @@ export default function GameScreen({
 
             {activeTab === 'market' ? (
                 <>
-                    <div className="mb-4 bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+                    <div className="mb-4 bg-slate-800 rounded-lg overflow-hidden border border-slate-700 px-2">
                         {Object.keys(currentPrices).map((item) => {
-                            const buyMult = 1.0 - (player.race?.stats.buyMod || 0);
-                            const displayPrice = Math.ceil(currentPrices[item] * buyMult);
+                            // NEW: Get separate Buy/Sell prices using the helpers passed from App.jsx
+                            const buyPrice = getBuyPrice(currentPrices[item]);
+                            const sellPrice = getSellPrice(currentPrices[item]);
+                            
                             return (
-                                <MarketItem key={item} item={item} icon={getIcon(item)} price={displayPrice} myAvg={resources.inventory[item]?.avg || 0} haveStock={resources.inventory[item]?.count > 0} 
-                                    onBuy={() => onBuy(item)} onSell={() => onSell(item)} onSmartMax={() => onSmartMax(item)} 
+                                <MarketItem 
+                                    key={item} 
+                                    item={item} 
+                                    icon={getIcon(item)} 
+                                    buyPrice={buyPrice}
+                                    sellPrice={sellPrice}
+                                    myAvg={resources.inventory[item]?.avg || 0} 
+                                    haveStock={resources.inventory[item]?.count > 0} 
+                                    onBuy={() => onBuy(item)} 
+                                    onSell={() => onSell(item)} 
+                                    onBuyMax={() => onBuyMax(item)} 
+                                    onSellAll={() => onSellAll(item)}
                                 />
                             );
                         })}
@@ -59,16 +71,13 @@ export default function GameScreen({
             ) : (
                 <div className="mb-4 flex-grow space-y-2">
                     {UPGRADES.filter(u => {
-                        // 1. CHECK BANS (If you match a ban, hide it)
+                        // 1. CHECK BANS
                             if (u.ban) {
-                                // Check Race Ban
                                 if (Array.isArray(u.ban.race)) {
                                     if (u.ban.race.includes(player.race.id)) return false;
                                 } else if (u.ban.race === player.race.id) {
                                     return false;
                                 }
-
-                                // Check Class Ban
                                 if (Array.isArray(u.ban.class)) {
                                     if (u.ban.class.includes(player.class.id)) return false;
                                 } else if (u.ban.class === player.class.id) {
@@ -76,19 +85,18 @@ export default function GameScreen({
                                 }
                             }
 
-                        // 2. CHECK REQS (If req exists, you MUST match it)
+                        // 2. CHECK REQS
                         if (u.req) {
                             if (u.req.class && u.req.class !== player.class.id) return false;
                             if (u.req.race && u.req.race !== player.race.id) return false;
                         }
                         
-                        return true; // If no bans hit and reqs met (or empty), show it
+                        return true; 
                     }).map((u) => {
                         const owned = playerItems.find(i => i.id === u.id);
                         return (
                             <div key={u.id} className={`flex justify-between items-center p-3 rounded border ${owned ? 'bg-slate-800/50 border-slate-700 opacity-50' : 'bg-slate-800 border-slate-600'}`}>
                                 <div className="flex items-center gap-3">
-                                        {/* Dynamic Icon based on Type */}
                                     {u.type === 'combat' && <Sword size={20} className="text-red-400"/>}
                                     {u.type === 'defense' && <Shield size={20} className="text-blue-400"/>}
                                     {u.type === 'inventory' && <ShoppingBag size={20} className="text-yellow-400"/>}
@@ -104,7 +112,7 @@ export default function GameScreen({
 
             
             <button 
-                onClick={onTravel} // This now calls handleEndTurn
+                onClick={onTravel} 
                 className={`w-full text-white font-bold py-4 rounded-lg shadow-lg mb-4 flex items-center justify-center gap-2 ${
                     hasTraded ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-700 hover:bg-slate-600'
                 }`}
@@ -112,7 +120,7 @@ export default function GameScreen({
                 {hasTraded ? (
                     <><Map size={20}/> Travel to New Location</>
                 ) : (
-                    <><Hammer size={20}/> Work & Travel ({50}-{200}g)</>
+                    <><Map size={20}/> Work & Travel (50-200g)</>
                 )}
             </button>
 

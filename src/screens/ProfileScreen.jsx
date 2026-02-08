@@ -1,13 +1,23 @@
-import { User, X, Skull } from 'lucide-react';
+import { User, X, Skull, Edit2} from 'lucide-react';
 
-export default function ProfileScreen({ profileData, onClose }) {
+export default function ProfileScreen({ profileData, onClose, userProfile, onEditTag }) {
     if (!profileData) return null;
     return (
         <div className="min-h-screen bg-slate-900 text-slate-200 p-4 max-w-md mx-auto border-x border-slate-700">
+            
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-yellow-500 flex items-center gap-2"><User size={24} className="text-yellow-500"/> PLAYER STATS</h1>
-                <button onClick={onClose} className="p-2 bg-slate-800 rounded hover:bg-slate-700"><X size={20}/></button>
-            </div>
+                <div>
+                    <h1 className="text-2xl font-bold text-yellow-500 flex items-center gap-2">
+                        <User size={24} className="text-yellow-500"/> 
+                        {userProfile?.gamertag || "COMMANDER"}
+                    </h1>
+                    <button onClick={onEditTag} className="text-[10px] text-blue-400 flex items-center gap-1 hover:text-blue-300 mt-1">
+                        <Edit2 size={10}/> Change Gamer Tag
+                    </button> 
+                </div>
+                <button onClick={onClose} className="p-2 bg-slate-800 rounded hover:bg-slate-700"><X size={20}/></button>  
+            </div>                 
+            
             <div className="space-y-6">
                 <div className="bg-slate-800 p-4 rounded-lg border border-slate-700 shadow-lg">
                     <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Lifetime Service</h2>
