@@ -271,24 +271,24 @@ function App() {
     // RISK CHECK
     if (Math.random() > locObj.risk) return recalcPrices(locObj);
 
-    // DYNAMIC EVENT POOL
-    let eventPool = [...EVENTS];
-
-    // NET WORTH CHECK FOR GUARDS
+        // 1. Calculate Net Worth FIRST
     const inventoryValue = Object.keys(resources.inventory).reduce((total, item) => {
         const count = resources.inventory[item]?.count || 0;
-        const price = getSellPrice(currentPrices[item] || 0); // Use sell price for valuation
+        const price = getSellPrice(currentPrices[item] || 0); 
         return total + (count * price);
     }, 0);
     const netWorth = resources.money + inventoryValue;
 
-    if (netWorth > 1000000) {
-        // Add Guards multiple times to increase odds if rich
-        const guardEvent = EVENTS.find(e => e.id === 'guards');
-        eventPool.push(guardEvent);
-        eventPool.push(guardEvent);
-    }
+    // 2. Filter the pool: Remove Guards by default
+    let eventPool = EVENTS.filter(e => e.id !== 'guards');
 
+    // 3. Add Guards ONLY if Rich (> 1 Million)
+    if (netWorth > 1000000) {
+        const guardEvent = EVENTS.find(e => e.id === 'guards');
+        // Add them multiple times to make them the dominant threat at high levels
+        eventPool.push(guardEvent);
+        eventPool.push(guardEvent); 
+    }
     const event = eventPool[Math.floor(Math.random() * eventPool.length)];
 
     // COMBAT EVENT Setup
