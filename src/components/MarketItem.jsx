@@ -17,9 +17,16 @@ export default function MarketItem({ item, buyPrice, sellPrice, myAvg, haveStock
             
             {/* LEFT: Name & Stats */}
             <div className="flex flex-col justify-center mr-3 min-w-[90px]">
-                {/* Name */}
+                {/* Name & Avg Cost */}
                 <div className="font-bold text-slate-100 text-sm truncate flex items-center gap-2 mb-1">
-                    {icon} <span className="capitalize">{item}</span>
+                    {icon} 
+                    <span className="capitalize">{item}</span>
+                    {/* NEW: Avg Cost Text Only */}
+                    {haveStock && (
+                        <span className="text-[10px] font-normal text-blue-400 ml-1 opacity-80">
+                            avg {Math.floor(myAvg)}
+                        </span>
+                    )}
                 </div>
                 
                 {/* Prices: Single Line for Compactness */}
