@@ -378,7 +378,7 @@ function App() {
               else {
                   // SCENARIO: INCINERATED (Double Damage)
                   const dmg = combatEvent.damage * 2;
-                  const finalDmg = Math.max(0, rawDmg - defense); // Apply defense
+                  const finalDmg = Math.max(0, dmg - defense); // Apply defense
                   setHealth(h => {
                       const newH = h - finalDmg;
                       if (newH <= 0) setTimeout(() => triggerGameOver("Dragon Fire"), 500);
