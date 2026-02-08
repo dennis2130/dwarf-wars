@@ -10,6 +10,19 @@ export default function HelpScreen({ onClose }) {
             </div>
 
             <div className="space-y-8 pb-8">
+
+                {/* LORE */}
+                <section className="bg-slate-800/50 p-4 rounded-lg border border-slate-700 italic text-slate-400 text-sm leading-relaxed text-center">
+                    <p>
+                        "The Realm is in chaos. Dragons burn the skies, goblins run the slums, and inflation is rampant."
+                    </p>
+                    <br/>
+                    <p>
+                        "You have <strong>31 Days</strong> to turn your measly pocket change into a fortune. 
+                        Pay the <strong className="text-red-400">Obsidian Vault</strong> back, or face the consequences."
+                    </p>
+                </section>
+
                 {/* INTRO */}
                 <section>
                     <h2 className="text-yellow-500 font-bold uppercase tracking-widest border-b border-slate-700 mb-2">The Goal</h2>
@@ -23,9 +36,9 @@ export default function HelpScreen({ onClose }) {
                 <section>
                     <h2 className="text-blue-400 font-bold uppercase tracking-widest border-b border-slate-700 mb-2">Controls</h2>
                     <ul className="text-sm text-slate-400 space-y-2 list-disc list-inside">
-                        <li><strong>Travel:</strong> Moves you to a new city and advances the day.</li>
+                        <li><strong>Travel:</strong> If you traded today, you move to a new city.</li>
+                        <li><strong>Work:</strong> If you haven't traded, you stay in town, heal slightly, and earn 50-200g.</li>
                         <li><strong>MAX Button:</strong> Smartly decides to Buy Max (if you have none) or Sell All (if profitable).</li>
-                        <li><strong>Upgrades:</strong> Check the "Upgrades" tab to buy Mules (Inventory) or Weapons (Combat).</li>
                     </ul>
                 </section>
 
@@ -39,22 +52,36 @@ export default function HelpScreen({ onClose }) {
                     </ul>
                 </section>
 
-                {/* STATS */}
+                {/* RACES */}
                 <section>
-                    <h2 className="text-green-400 font-bold uppercase tracking-widest border-b border-slate-700 mb-2">Races & Classes</h2>
-                    <div className="grid grid-cols-1 gap-4">
+                    <h2 className="text-blue-400 font-bold uppercase tracking-widest border-b border-slate-700 mb-4">Races</h2>
+                    <div className="grid grid-cols-1 gap-3">
                         {RACES.map(r => (
-                            <div key={r.id} className="bg-slate-800 p-2 rounded">
-                                <div className="font-bold text-white">{r.name}</div>
-                                <div className="text-xs text-green-400">{r.bonus}</div>
-                                <div className="text-[10px] text-slate-500 italic">{r.desc}</div>
+                            <div key={r.id} className="bg-slate-800/50 p-3 rounded border border-slate-700 border-l-4 border-l-blue-500 shadow-sm">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="font-bold text-slate-200">{r.name}</span>
+                                    <span className="text-[10px] bg-blue-900/30 text-blue-300 px-2 py-0.5 rounded border border-blue-800">{r.bonus}</span>
+                                </div>
+                                <div className="text-xs text-slate-500 italic">"{r.desc}"</div>
                             </div>
                         ))}
+                    </div>
+                </section>
+
+                {/* CLASSES */}
+                <section>
+                    <h2 className="text-green-400 font-bold uppercase tracking-widest border-b border-slate-700 mb-4 mt-8">Classes</h2>
+                    <div className="grid grid-cols-1 gap-3">
                         {CLASSES.map(c => (
-                            <div key={c.id} className="bg-slate-800 p-2 rounded">
-                                <div className="font-bold text-white">{c.name}</div>
-                                <div className="text-xs text-green-400">Start: {c.startingMoney}g</div>
-                                <div className="text-[10px] text-slate-500 italic">{c.desc}</div>
+                            <div key={c.id} className="bg-slate-800/50 p-3 rounded border border-slate-700 border-l-4 border-l-green-500 shadow-sm">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="font-bold text-slate-200">{c.name}</span>
+                                    <div className="text-right">
+                                        <div className="text-[10px] text-green-400 font-mono">Start: {c.startingMoney}g</div>
+                                        <div className="text-[10px] text-red-400 font-mono">Debt: {c.startingDebt}g</div>
+                                    </div>
+                                </div>
+                                <div className="text-xs text-slate-500 italic">"{c.desc}"</div>
                             </div>
                         ))}
                     </div>

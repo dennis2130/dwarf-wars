@@ -39,6 +39,7 @@ function App() {
   const [log, setLog] = useState([]);
   const [eventMsg, setEventMsg] = useState(null);
   const [flash, setFlash] = useState(''); 
+  const [hasTraded, setHasTraded] = useState(false);
 
   // Combat UI
   const [combatEvent, setCombatEvent] = useState(null); 
@@ -148,6 +149,7 @@ function App() {
     setPlayerItems([]); setCombatBonus(0); setDragonsKilled(0);
     setCombatStats({ wins: 0, losses: 0, flees: 0 });
     setDay(1);
+    setHasTraded(false);
     
     const startLoc = LOCATIONS[0];
     setCurrentLocation(startLoc);
@@ -285,7 +287,13 @@ function App() {
   const finishCombat = (d20Roll) => {
       if (!combatEvent) return;
 
-      const total = d20Roll + combatBonus + (player.race.stats.combat || 0);
+      let racialBonus = 0;
+      // Kobold vs Dragon
+      if (player.race.id === 'kobold' && combatEvent.name === 'Dragon') racialBonus = 5;
+      // Halfling vs Watch
+      if (player.race.id === 'halfling' && combatEvent.name === 'City Watch') racialBonus = 5;
+
+      const total = d20Roll + combatBonus + (player.race.stats.combat || 0) + racialBonus;
       
       // --- 1. CRITICAL SUCCESS (Nat 20) ---
       if (d20Roll === 20) {
@@ -293,7 +301,17 @@ function App() {
           
           // Flavor Text Generator
           let victoryText = `CRITICAL HIT! You obliterated the ${combatEvent.name}!`;
-          if (combatEvent.name === 'Dragon') {
+
+          // --- RACIAL OVERRIDES ---
+          if (player.race.id === 'kobold' && combatEvent.name === 'Dragon') {
+              victoryText = "CRIT SUCCESS! You bowed so low the Dragon decided to spare you!";
+              // Note: Do we still give loot? Yes, maybe the Dragon gave you a gift.
+          }
+          else if (player.race.id === 'halfling' && combatEvent.name === 'City Watch') {
+              victoryText = "CRIT SUCCESS! You slipped between their legs and vanished into the crowd!";
+          }
+          // --- STANDARD FLAVOR ---
+          else if (combatEvent.name === 'Dragon') {
               const text = [
                   "You drove your weapon straight into the Dragon's heart!",
                   "You severed the beast's head in a single strike!",
@@ -360,12 +378,13 @@ function App() {
               else {
                   // SCENARIO: INCINERATED (Double Damage)
                   const dmg = combatEvent.damage * 2;
+                  const finalDmg = Math.max(0, rawDmg - defense); // Apply defense
                   setHealth(h => {
-                      const newH = h - dmg;
+                      const newH = h - finalDmg;
                       if (newH <= 0) setTimeout(() => triggerGameOver("Dragon Fire"), 500);
                       return newH;
                   });
-                  setLog(prev => [`CRIT FAIL! Direct hit by fire breath! Took ${dmg} dmg.`, ...prev]);
+                  setLog(prev => [`CRIT FAIL! Direct hit by fire breath! Took ${finalDmg} dmg.`, ...prev]);
               }
           } 
           
@@ -420,18 +439,20 @@ function App() {
           triggerFlash('gold');
           setLog(prev => [`VICTORY! Rolled ${d20Roll} (+${total - d20Roll}) vs DC ${combatEvent.difficulty}.`, ...prev]);
           generateLoot(combatEvent.name);
-          if (combatEvent.name === 'Dragon') setDragonsKilled(d => d + 1);
+          if (combatEvent.name === 'Dragon' && player.race.id !== 'kobold') setDragonsKilled(d => d + 1);
           setCombatStats(prev => ({ ...prev, wins: prev.wins + 1 }));
       } else {
           // NORMAL LOSS
           setHealth(h => {
-              const newH = h - combatEvent.damage;
+              // Apply Defense (but don't heal if defense > damage)
+              const mitigatedDmg = Math.max(0, combatEvent.damage - defense);
+              
+              const newH = h - mitigatedDmg;
               if (newH <= 0) setTimeout(() => triggerGameOver(combatEvent.name), 500);
               return newH;
           });
           triggerFlash('red');
-          setLog(prev => [`DEFEAT! Rolled ${d20Roll} (+${total - d20Roll}) vs DC ${combatEvent.difficulty}. Took ${combatEvent.damage} dmg.`, ...prev]);
-          if (combatEvent.goldLoss > 0) setResources(prev => ({...prev, money: Math.floor(prev.money * (1 - combatEvent.goldLoss))}));
+          setLog(prev => [`DEFEAT! ... Took ${Math.max(0, combatEvent.damage - defense)} dmg.`, ...prev]);          if (combatEvent.goldLoss > 0) setResources(prev => ({...prev, money: Math.floor(prev.money * (1 - combatEvent.goldLoss))}));
           setCombatStats(prev => ({ ...prev, losses: prev.losses + 1 }));
       }
       setCombatEvent(null);
@@ -456,6 +477,24 @@ function App() {
   };
 
   // --- ACTIONS ---
+  const doOddJob = () => {
+      // 1. Advance Day
+      if (day >= MAX_DAYS) return triggerGameOver();
+      setDay(day + 1);
+      if (debt > 0) { setDebt(d => d + Math.ceil(debt * 0.05)); }
+
+      // 2. Earn Money
+      const wage = Math.floor(Math.random() * 150) + 50; // 50-200g
+      updateMoney(wage);
+      setLog(prev => [`Worked odd jobs. Earned ${wage}g.`, ...prev]);
+      triggerFlash('green');
+
+      // 3. Trigger Event (Risk of working in the city)
+      // We use current location, but maybe slightly reduced risk?
+      // Let's just run standard event logic to keep it dangerous.
+      triggerRandomEvent(currentLocation);
+  };
+
   const buyItem = (item) => {
     const buyMult = 1.0 - (player.race?.stats.buyMod || 0);
     const cost = Math.ceil(currentPrices[item] * buyMult); 
@@ -467,6 +506,7 @@ function App() {
         const totalValue = (currentItemData.count * currentItemData.avg) + cost;
         return { money: currentMoney - cost, inventory: { ...currentInv, [item]: { count: currentItemData.count + 1, avg: totalValue / (currentItemData.count + 1) } } };
     });
+    setHasTraded(true);
   };
 
   const sellItem = (item) => {
@@ -477,6 +517,7 @@ function App() {
         const value = Math.floor(currentPrices[item] * sellMult); 
         return { money: prev.money + value, inventory: { ...currentInv, [item]: { ...currentInv[item], count: currentInv[item].count - 1 } } };
     });
+    setHasTraded(true);
   };
 
   const buyMax = (item) => {
@@ -493,6 +534,7 @@ function App() {
         const totalValue = (currentItemData.count * currentItemData.avg) + totalCost;
         return { money: prev.money - totalCost, inventory: { ...prev.inventory, [item]: { count: currentItemData.count + amountToBuy, avg: totalValue / (currentItemData.count + amountToBuy) } } };
     });
+    setHasTraded(true);
   };
 
   const sellAll = (item) => {
@@ -503,6 +545,7 @@ function App() {
         const value = Math.floor(currentPrices[item] * sellMult);
         return { money: prev.money + (value * count), inventory: { ...prev.inventory, [item]: { count: 0, avg: 0 } } };
     });
+    setHasTraded(true);
   };
 
   const handleSmartMax = (item) => {
@@ -541,21 +584,38 @@ function App() {
         if (prev.money <= 0 || debt <= 0) return prev;
         const amount = Math.min(prev.money, debt);
         setDebt(d => d - amount);
-        setLog(logPrev => [`Paid ${amount}g loan.`, ...logPrev]);
+        setLog(logPrev => [`Paid ${amount}g to the Vault.`, ...logPrev]);
         return { ...prev, money: prev.money - amount };
     });
   };
 
-  const travel = () => {
+  const handleEndTurn = () => {
     if (day >= MAX_DAYS) return triggerGameOver();
-    setDay(day + 1);
+    
+    // Common End Turn Logic
+    setDay(d => d + 1);
     if (debt > 0) { setDebt(d => d + Math.ceil(debt * 0.05)); }
-    let nextLoc;
-    do { nextLoc = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)]; } while (nextLoc.name === currentLocation.name);
-    setCurrentLocation(nextLoc);
-    triggerRandomEvent(nextLoc);
-  };
+    setHasTraded(false); // Reset for next day
 
+    if (hasTraded) {
+        // --- TRAVEL LOGIC (Moved) ---
+        let nextLoc;
+        do { nextLoc = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)]; } 
+        while (nextLoc.name === currentLocation.name);
+        setCurrentLocation(nextLoc);
+        triggerRandomEvent(nextLoc);
+    } else {
+        // --- WORK LOGIC (Stay) ---
+        const wage = Math.floor(Math.random() * 150) + 50;
+        updateMoney(wage);
+        setLog(prev => [`Worked in ${currentLocation.name}. Earned ${wage}g.`, ...prev]);
+        triggerFlash('green');
+        
+        // You stay, but prices fluctuate and events happen
+        recalcPrices(currentLocation); 
+        triggerRandomEvent(currentLocation); 
+    }
+  };
   // --- ROUTER ---
   return (
     <>
@@ -576,10 +636,11 @@ function App() {
       {gameState === 'playing' && <GameScreen 
           player={player} day={day} maxDays={MAX_DAYS} location={currentLocation} resources={resources} health={health} maxHealth={maxHealth} debt={debt} 
           currentPrices={currentPrices} log={log} eventMsg={eventMsg} flash={flash} combatEvent={combatEvent} isRolling={isRolling} rollTarget={rollTarget}
-          playerItems={playerItems} onPayDebt={payDebt} onTravel={travel} onRestart={() => { if(window.confirm("Restart?")) { logGameSession('Quit (Restart)'); startGame(); }}} 
+          playerItems={playerItems} onPayDebt={payDebt} onTravel={handleEndTurn} onRestart={() => { if(window.confirm("Restart?")) { logGameSession('Quit (Restart)'); startGame(); }}} 
           onQuit={() => { if(window.confirm("Quit?")) { logGameSession('Quit (Menu)'); setGameState('start'); }}} 
           onBuy={buyItem} onSell={sellItem} onSmartMax={handleSmartMax} onBuyUpgrade={buyUpgrade} 
           combatActions={{ onRollComplete: handleRollComplete, onRun: resolveRunAway, onFight: startCombatRoll, bonus: combatBonus + (player.race.stats.combat || 0) }}
+          onWork={doOddJob} hasTraded={hasTraded}
       />}
     </>
   );

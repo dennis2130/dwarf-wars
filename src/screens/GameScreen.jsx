@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Map, RotateCcw, LogOut, Shield, ShoppingBag } from 'lucide-react';
+import { Map, RotateCcw, LogOut, Shield, ShoppingBag, Hammer, Sword, FlaskConical  } from 'lucide-react';
 import StatsBar from '../components/StatsBar';
 import InventoryGrid from '../components/InventoryGrid';
 import MarketItem from '../components/MarketItem';
@@ -12,7 +12,7 @@ export default function GameScreen({
     currentPrices, priceMod, log, eventMsg, flash, combatEvent, isRolling, rollTarget,
     playerItems, onPayDebt, onTravel, onRestart, onQuit, 
     onBuy, onSell, onSmartMax, onBuyUpgrade, 
-    combatActions 
+    combatActions, hasTraded, onWork
 }) {
     const [activeTab, setActiveTab] = useState('market');
 
@@ -58,12 +58,41 @@ export default function GameScreen({
                 </>
             ) : (
                 <div className="mb-4 flex-grow space-y-2">
-                    {UPGRADES.map((u) => {
+                    {UPGRADES.filter(u => {
+                        // 1. CHECK BANS (If you match a ban, hide it)
+                            if (u.ban) {
+                                // Check Race Ban
+                                if (Array.isArray(u.ban.race)) {
+                                    if (u.ban.race.includes(player.race.id)) return false;
+                                } else if (u.ban.race === player.race.id) {
+                                    return false;
+                                }
+
+                                // Check Class Ban
+                                if (Array.isArray(u.ban.class)) {
+                                    if (u.ban.class.includes(player.class.id)) return false;
+                                } else if (u.ban.class === player.class.id) {
+                                    return false;
+                                }
+                            }
+
+                        // 2. CHECK REQS (If req exists, you MUST match it)
+                        if (u.req) {
+                            if (u.req.class && u.req.class !== player.class.id) return false;
+                            if (u.req.race && u.req.race !== player.race.id) return false;
+                        }
+                        
+                        return true; // If no bans hit and reqs met (or empty), show it
+                    }).map((u) => {
                         const owned = playerItems.find(i => i.id === u.id);
                         return (
                             <div key={u.id} className={`flex justify-between items-center p-3 rounded border ${owned ? 'bg-slate-800/50 border-slate-700 opacity-50' : 'bg-slate-800 border-slate-600'}`}>
                                 <div className="flex items-center gap-3">
-                                    {u.type === 'defense' || u.type === 'combat' ? <Shield size={20} className="text-blue-400"/> : <ShoppingBag size={20} className="text-green-400"/>}
+                                        {/* Dynamic Icon based on Type */}
+                                    {u.type === 'combat' && <Sword size={20} className="text-red-400"/>}
+                                    {u.type === 'defense' && <Shield size={20} className="text-blue-400"/>}
+                                    {u.type === 'inventory' && <ShoppingBag size={20} className="text-yellow-400"/>}
+                                    {u.type === 'heal' && <FlaskConical size={20} className="text-green-400"/>}
                                     <div><div className="font-bold text-sm text-slate-200">{u.name}</div><div className="text-[10px] text-slate-400">{u.desc}</div></div>
                                 </div>
                                 {owned ? <span className="text-xs text-green-500 font-bold">OWNED</span> : <button onClick={() => onBuyUpgrade(u)} className="bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-1 rounded text-xs font-bold">{u.cost} g</button>}
@@ -73,7 +102,20 @@ export default function GameScreen({
                 </div>
             )}
 
-            <button onClick={onTravel} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-lg shadow-lg mb-4 flex items-center justify-center gap-2"><Map size={20}/> Travel to New Location</button>
+            
+            <button 
+                onClick={onTravel} // This now calls handleEndTurn
+                className={`w-full text-white font-bold py-4 rounded-lg shadow-lg mb-4 flex items-center justify-center gap-2 ${
+                    hasTraded ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-700 hover:bg-slate-600'
+                }`}
+            >
+                {hasTraded ? (
+                    <><Map size={20}/> Travel to New Location</>
+                ) : (
+                    <><Hammer size={20}/> Work & Rest ({50}-{200}g)</>
+                )}
+            </button>
+
 
             <div className="bg-black p-3 rounded-lg h-24 overflow-y-auto text-xs font-mono text-green-500 border border-slate-700 shadow-inner">
                 {log.map((entry, i) => <div key={i} className="mb-1 border-b border-gray-900 pb-1 last:border-0"> &gt; {entry}</div>)}
