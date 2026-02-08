@@ -157,7 +157,8 @@ function App() {
         status: status,
         days_survived: day,
         upgrades: playerItems.map(i => i.name),
-        combat_stats: { ...combatStats, dragons_killed: dragonsKilled, cause_of_death: cause }
+        combat_stats: { ...combatStats, dragons_killed: dragonsKilled, cause_of_death: cause }, 
+        gamertag: userProfile?.gamertag || null
     };
 
     try {
