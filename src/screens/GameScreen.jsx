@@ -112,7 +112,7 @@ export default function GameScreen({
                 {hasTraded ? (
                     <><Map size={20}/> Travel to New Location</>
                 ) : (
-                    <><Hammer size={20}/> Work & Rest ({50}-{200}g)</>
+                    <><Hammer size={20}/> Work & Travel ({50}-{200}g)</>
                 )}
             </button>
 

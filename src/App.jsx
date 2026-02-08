@@ -595,26 +595,23 @@ function App() {
     // Common End Turn Logic
     setDay(d => d + 1);
     if (debt > 0) { setDebt(d => d + Math.ceil(debt * 0.05)); }
-    setHasTraded(false); // Reset for next day
-
-    if (hasTraded) {
-        // --- TRAVEL LOGIC (Moved) ---
-        let nextLoc;
-        do { nextLoc = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)]; } 
-        while (nextLoc.name === currentLocation.name);
-        setCurrentLocation(nextLoc);
-        triggerRandomEvent(nextLoc);
-    } else {
-        // --- WORK LOGIC (Stay) ---
+    
+    // BONUS: If you didn't trade, you worked odd jobs before leaving
+    if (!hasTraded) {
         const wage = Math.floor(Math.random() * 150) + 50;
         updateMoney(wage);
-        setLog(prev => [`Worked in ${currentLocation.name}. Earned ${wage}g.`, ...prev]);
+        setLog(prev => [`Worked passage to next city. Earned ${wage}g.`, ...prev]);
         triggerFlash('green');
-        
-        // You stay, but prices fluctuate and events happen
-        recalcPrices(currentLocation); 
-        triggerRandomEvent(currentLocation); 
     }
+    
+    setHasTraded(false); 
+
+    // MOVE (Always happens now)
+    let nextLoc;
+    do { nextLoc = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)]; } 
+    while (nextLoc.name === currentLocation.name);
+    setCurrentLocation(nextLoc);
+    triggerRandomEvent(nextLoc);
   };
   // --- ROUTER ---
   return (
