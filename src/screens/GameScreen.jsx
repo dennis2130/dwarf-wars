@@ -43,7 +43,7 @@ export default function GameScreen({
 
             {activeTab === 'market' ? (
                 <>
-                    <div className="mb-4 bg-slate-800 rounded-lg overflow-hidden border border-slate-700 px-2">
+                    <div className="mb-4 bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
                         {Object.keys(currentPrices).map((item) => {
                             // NEW: Get separate Buy/Sell prices using the helpers passed from App.jsx
                             const buyPrice = getBuyPrice(currentPrices[item]);
