@@ -49,6 +49,7 @@ function App() {
   const [combatEvent, setCombatEvent] = useState(null); 
   const [isRolling, setIsRolling] = useState(false);
   const [rollTarget, setRollTarget] = useState(null);
+  const [checkEvent, setCheckEvent] = useState(null);
 
   const MAX_DAYS = 31;
 
@@ -70,6 +71,14 @@ function App() {
       setSession(session);
       if (session) {
           checkProfile(session.user.id);
+          
+          // --- FIX: Clean the URL hash so we don't try to use the token twice ---
+          // This removes the #access_token=... junk from the address bar
+          if (window.location.hash && window.location.hash.includes('access_token')) {
+              const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+              window.history.replaceState({}, document.title, newUrl);
+          }
+          // ---------------------------------------------------------------------
       } else {
           setUserProfile(null);
       }
@@ -278,6 +287,11 @@ function App() {
 
     let validEvents = eventPool.filter(e => netWorth >= (e.req_net_worth || 0));
 
+    // --- DEBUG: FORCE TROLL EVENT ---
+    // Uncomment this line to test the logic, then delete it!
+     //validEvents = validEvents.filter(e => e.slug === 'troll_bridge' || e.slug === 'dragon');    
+    // --------------------------------
+
     if (validEvents.length === 0) return recalcPrices(locObj);
 
     if (netWorth > 1000000) {
@@ -290,6 +304,8 @@ function App() {
 
     const event = validEvents[Math.floor(Math.random() * validEvents.length)];
 
+    // Handle Event Types
+    // 1. Combat Event
     if (event.type === 'combat') {
         let stats = event.config; 
         if (event.slug === 'guards' && netWorth > 1000000) {
@@ -304,6 +320,20 @@ function App() {
         });
         return recalcPrices(locObj); 
     }
+
+    // 2. Skill Check Event (New)
+
+    if (event.type === 'check') {
+        
+        setCheckEvent({
+            title: event.slug.replace('_', ' '), // simple cleanup
+            text: event.text,
+            config: event.config, // Contains difficulty, outcomes, stat
+            result: null // No result yet
+        });
+        return recalcPrices(locObj);
+    }
+
 
     let msg = event.text;
     let eventPriceMod = 1.0;
@@ -320,7 +350,15 @@ function App() {
   };
 
   const startCombatRoll = () => {
-      const d20 = Math.ceil(Math.random() * 20);
+      // 1. Create a buffer for a random 32-bit integer
+      const array = new Uint32Array(1);
+      
+      // 2. Fill it with cryptographically strong randomness from the OS
+      window.crypto.getRandomValues(array);
+      
+      // 3. Modulo math: (RandomHugeNumber % 20) gives 0-19. Add 1 to get 1-20.
+      const d20 = (array[0] % 20) + 1;
+      
       setRollTarget(d20);
       setIsRolling(true);
   };
@@ -332,17 +370,86 @@ function App() {
   const generateLoot = (enemyType) => {
     const tier = enemyType === 'Dragon' ? 5 : 1;
     const roll = Math.random();
+    let lootMsg = "";
+    
     if (roll < 0.5) {
         const gold = 100 * tier * (Math.floor(Math.random() * 5) + 1);
-        updateMoney(gold); setLog(prev => [`Looted ${gold}g.`, ...prev]); triggerFlash('gold');
+        updateMoney(gold); 
+        lootMsg = `Looted ${gold} gold coins.`;
+        triggerFlash('gold');
     } else if (roll < 0.8) {
-        const heal = 10 * tier; setHealth(h => Math.min(h + heal, maxHealth)); setLog(prev => [`Found supplies. Healed ${heal}.`, ...prev]); triggerFlash('green');
+        const heal = 10 * tier; 
+        setHealth(h => Math.min(h + heal, maxHealth)); 
+        lootMsg = `Found supplies. Healed ${heal} HP.`;
+        triggerFlash('green');
     } else {
-        const slots = 2 * tier; setMaxInventory(m => m + slots); setLog(prev => [`Found a ${enemyType === 'Dragon' ? 'Chest' : 'Pouch'}. Inv +${slots}.`, ...prev]);
+        const slots = 2 * tier; 
+        setMaxInventory(m => m + slots); 
+        lootMsg = `Found a ${enemyType === 'Dragon' ? 'Chest' : 'Pouch'}. Inventory +${slots}.`;
     }
+    setLog(prev => [lootMsg, ...prev]);
+    return lootMsg; // <--- RETURN THIS
   };
 
-  const finishCombat = (d20Roll) => {
+// --- NEW: GENERIC OUTCOME HANDLER ---
+  const applyOutcomeEffect = (effect) => {
+      // 1. Handle Gold (Flat or Percent)
+      if (effect.gold) updateMoney(effect.gold);
+      if (effect.gold_pct) {
+          setResources(prev => {
+              const delta = Math.floor(prev.money * effect.gold_pct);
+              return { ...prev, money: Math.max(0, prev.money + delta) };
+          });
+      }
+
+      // 2. Handle Health
+      if (effect.health) {
+          setHealth(h => {
+              const newH = Math.min(h + effect.health, maxHealth);
+              if (newH <= 0) setTimeout(() => triggerGameOver("Event Death"), 500);
+              return newH;
+          });
+      }
+
+      // 3. Handle Items (Add/Remove)
+      if (effect.add_item) {
+          setResources(prev => {
+              const item = effect.add_item;
+              const count = effect.amount || 1;
+              const currentInv = prev.inventory;
+              // Only add if space
+              const totalItems = Object.values(currentInv).reduce((a, b) => a + b.count, 0);
+              if (totalItems + count <= maxInventory) {
+                  return {
+                      ...prev,
+                      inventory: {
+                          ...currentInv,
+                          [item]: { 
+                              ...currentInv[item], 
+                              count: currentInv[item].count + count,
+                              // If adding free item, avg cost goes down slightly (optional math, ignored for simplicity)
+                              avg: currentInv[item].avg 
+                          }
+                      }
+                  };
+              }
+              return prev; // No space, lose item
+          });
+      }
+
+      if (effect.remove_all_item) {
+          setResources(prev => ({
+              ...prev,
+              inventory: {
+                  ...prev.inventory,
+                  [effect.remove_all_item]: { count: 0, avg: 0 }
+              }
+          }));
+      }
+  };
+
+
+const finishCombat = (d20Roll) => {
       if (!combatEvent) return;
 
       let racialBonus = 0;
@@ -351,47 +458,107 @@ function App() {
 
       const total = d20Roll + combatBonus + (player.race.stats.combat || 0) + racialBonus;
       
+      let outcome = '';
+      let title = '';
+      let flavorText = '';
+      let lootText = ''; // To store loot results
+
+      // --- 1. CRITICAL SUCCESS ---
       if (d20Roll === 20) {
+          outcome = 'crit_success';
+          title = 'CRITICAL HIT!';
+          flavorText = `You obliterated the ${combatEvent.name}!`;
           triggerFlash('gold');
-          setLog(prev => [`CRITICAL HIT! You obliterated the ${combatEvent.name}!`, ...prev]);
-          generateLoot(combatEvent.name);
-          generateLoot(combatEvent.name);
+          
           if (combatEvent.name === 'Dragon') setDragonsKilled(d => d + 1);
           setCombatStats(prev => ({ ...prev, wins: prev.wins + 1 }));
+          
+          // Double Loot
+          const l1 = generateLoot(combatEvent.name);
+          const l2 = generateLoot(combatEvent.name);
+          lootText = `${l1} ${l2}`;
       }
+      // --- 2. CRITICAL FAILURE ---
       else if (d20Roll === 1) {
+          outcome = 'crit_fail';
+          title = 'CRITICAL FAILURE';
           triggerFlash('red');
+          
+          // Crit Fail Logic
           const dmg = combatEvent.damage * 1.5;
           setHealth(h => {
              const newH = h - Math.max(0, dmg - defense);
              if (newH <= 0) setTimeout(() => triggerGameOver(combatEvent.name), 500);
              return newH;
           });
-          if (combatEvent.goldLoss > 0) setResources(prev => ({...prev, money: Math.floor(prev.money * 0.5)})); 
-          setLog(prev => [`CRIT FAIL! Disaster strikes!`, ...prev]);
+          
+          let failMsg = `You took ${Math.max(0, dmg - defense)} damage.`;
+
+          if (combatEvent.goldLoss > 0) {
+              setResources(prev => ({...prev, money: Math.floor(prev.money * 0.5)}));
+              failMsg += " Lost 50% of your gold!";
+          }
+          
+          flavorText = failMsg;
           setCombatStats(prev => ({ ...prev, losses: prev.losses + 1 }));
       }
+      // --- 3. NORMAL WIN ---
       else if (total >= combatEvent.difficulty) {
+          outcome = 'win';
+          title = 'VICTORY';
+          flavorText = `You defeated the ${combatEvent.name}.`;
           triggerFlash('gold');
-          setLog(prev => [`VICTORY! Rolled ${d20Roll} (+${total - d20Roll}) vs DC ${combatEvent.difficulty}.`, ...prev]);
-          generateLoot(combatEvent.name);
+          
           if (combatEvent.name === 'Dragon' && player.race.id !== 'kobold') setDragonsKilled(d => d + 1);
           setCombatStats(prev => ({ ...prev, wins: prev.wins + 1 }));
+          
+          lootText = generateLoot(combatEvent.name);
       } 
+      // --- 4. NORMAL LOSS ---
       else {
+          outcome = 'loss';
+          title = 'DEFEAT';
+          
           const mitigatedDmg = Math.max(0, combatEvent.damage - defense);
           setHealth(h => {
               const newH = h - mitigatedDmg;
               if (newH <= 0) setTimeout(() => triggerGameOver(combatEvent.name), 500);
               return newH;
           });
+          
+          flavorText = `You took ${mitigatedDmg} damage.`;
+          
+          if (combatEvent.goldLoss > 0) {
+              setResources(prev => ({...prev, money: Math.floor(prev.money * (1 - combatEvent.goldLoss))}));
+              flavorText += " They took some of your gold.";
+          }
+          
           triggerFlash('red');
-          setLog(prev => [`DEFEAT! Took ${mitigatedDmg} dmg.`, ...prev]);         
-          if (combatEvent.goldLoss > 0) setResources(prev => ({...prev, money: Math.floor(prev.money * (1 - combatEvent.goldLoss))}));
           setCombatStats(prev => ({ ...prev, losses: prev.losses + 1 }));
       }
+
+      // Log it
+      setLog(prev => [`${title}: ${flavorText}`, ...prev]);
+
+      // UPDATE MODAL STATE INSTEAD OF CLOSING
+      setCombatEvent(prev => ({
+          ...prev,
+          result: {
+              outcome,
+              title,
+              text: flavorText,
+              loot: lootText,
+              roll: d20Roll,
+              total: total
+          }
+      }));
+  };
+
+  const closeCombatModal = () => {
       setCombatEvent(null);
   };
+
+
 
   const resolveRunAway = () => {
       if (!combatEvent) return;
@@ -410,6 +577,86 @@ function App() {
       setCombatStats(prev => ({ ...prev, flees: prev.flees + 1 }));
       setCombatEvent(null);
   };
+
+
+  // --- SKILL CHECK LOGIC ---
+
+const startCheckRoll = () => {
+    // 1. Calculate the Target (True RNG)
+    const array = new Uint32Array(1);
+    window.crypto.getRandomValues(array);
+    const d20 = (array[0] % 20) + 1;
+
+    setRollTarget(d20);
+    setIsRolling(true);
+};
+
+const handleCheckRollComplete = () => {
+    // Wait for animation to finish
+    setTimeout(() => {
+        finishCheck(rollTarget);
+        setIsRolling(false);
+        setRollTarget(null);
+    }, 800);
+};
+
+const finishCheck = (d20) => {
+    if (!checkEvent) return;
+
+    const config = checkEvent.config;
+
+        let bonus = 0;
+        
+        switch (config.stat) {
+            case 'combat':
+                bonus = combatBonus + (player.race.stats.combat || 0);
+                break;
+            case 'negotiation':
+                // Example: Merchants, Bards, and Elves get +5 to talk their way out of things
+                if (['merchant', 'bard'].includes(player.class.id)) bonus += 5;
+                if (player.race.id === 'elf') bonus += 3;
+                break;
+            case 'luck':
+                // Halflings get +5 Luck
+                if (player.race.id === 'halfling') bonus += 5;
+                break;
+            default:
+                bonus = 0; // Default for unknown stats
+        }
+        
+        const total = d20 + bonus;
+
+    // 2. Determine Outcome
+    let outcomeKey = 'fail';
+    if (d20 === 20) outcomeKey = 'crit_success';
+    else if (d20 === 1) outcomeKey = 'crit_fail';
+    else if (total >= config.difficulty) outcomeKey = 'success';
+
+    const outcomeData = config.outcomes[outcomeKey];
+
+    // 3. Apply Effects
+    applyOutcomeEffect(outcomeData.effect); // <--- Uses the helper we made earlier
+
+    // 4. Update UI to show Result
+    const logText = `[${config.stat.toUpperCase()}] Rolled ${d20} + ${bonus} vs DC ${config.difficulty}. ${outcomeKey.toUpperCase()}!`;
+    setLog(prev => [logText, ...prev]);
+    triggerFlash(outcomeKey.includes('success') ? 'gold' : 'red');
+
+    // Update the modal to show the result text instead of the intro text
+    setCheckEvent(prev => ({
+        ...prev,
+        result: {
+            outcome: outcomeKey,
+            text: outcomeData.text,
+            roll: d20,
+            total: total
+        }
+    }));
+};
+
+const closeCheckModal = () => {
+    setCheckEvent(null);
+};
 
   // --- ACTIONS ---
   const doOddJob = () => {
@@ -566,7 +813,12 @@ function App() {
           onSellAll={sellAll}
           onBuyUpgrade={buyUpgrade} 
           combatActions={{ onRollComplete: handleRollComplete, onRun: resolveRunAway, onFight: startCombatRoll, bonus: combatBonus + (player.race.stats.combat || 0) }}
+          onCloseCombat={closeCombatModal} 
           onWork={doOddJob} hasTraded={hasTraded}
+          checkEvent={checkEvent}
+          onCheckRoll={startCheckRoll}
+          onCheckComplete={handleCheckRollComplete}
+          onCloseCheck={closeCheckModal}
       />}
     </>
   );

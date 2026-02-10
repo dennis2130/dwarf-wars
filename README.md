@@ -6,7 +6,7 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 
 ## Features
 
-- **Character Creation:** Choose your name, race (Human, Dwarf, Elf, Orc), and class (Merchant, Rogue, Warrior), each with unique bonuses and starting stats.
+- **Character Creation:** Select your race (Human, Dwarf, Elf, Orc, Kobold, Halfling) and class (Merchant, Rogue, Warrior, Bard, Monk, Wizard), each with unique bonuses and starting stats.
 - **Trading System:** Buy and sell a variety of items (rations, ale, potions, tools, scrolls, gems) at fluctuating prices across different locations.
 - **Dynamic Locations:** Travel between unique locations (Royal City, Goblin Slums, Elven Forest, Iron Forge, Orc Badlands), each with their own price modifiers and risk levels.
 - **Random Events:** Encounter random events including dragon attacks, encounters with city watch, goblin pickpockets, merchant blessings, found treasure, market crashes, and price surges that affect your health, gold, or prices.
@@ -18,7 +18,7 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 - **Taxation Mechanic:** If your net worth exceeds 1 million gold, the City Watch will pursue you, triggering guard encounters.
 - **Debt System:** Start with a debt based on your class. Pay it off before the end of 31 days to maximize your score.
 - **Gamer Tags:** Set and customize your public gamer tag (3-15 characters, profanity filtered) to appear on leaderboards if you log in with Google.
-- **Profanity Filtering:** Character names and gamer tags are validated against a profanity filter to keep the leaderboard clean.
+- **Profanity Filtering:** Gamer tags are validated against a profanity filter to keep the leaderboard clean.
 - **Smart Max Button:** Intelligently buy or sell the maximum amount of an item based on your gold, inventory space, and stock availability.
 - **Game Session Logging:** All game sessions are logged to the database, including player stats, upgrades acquired, and cause of death for analytics and balance improvements.
 - **Dynamic Leaderboard:** High scores are saved and displayed with multiple time-period filters: Daily (past 24 hours), Weekly (past 7 days), Monthly (past 30 days), and All Time rankings using Supabase backend.
@@ -100,7 +100,7 @@ The travel mechanic triggers random events that affect gameplay:
 
 ## Gameplay Overview
 
-1. **Create Your Hero:** Enter a name (validated for profanity), select a race and class. Each choice affects your stats:
+1. **Create Your Hero:** Select a race and class. Each choice affects your stats:
 	- **Races (6 total):**
 	  - Human: Inventory +20, Health +10, Combat +1 (Versatile)
 	  - Dwarf: Health +40, Sell items for 10% more (Greedy Negotiator)
@@ -146,7 +146,6 @@ The travel mechanic triggers random events that affect gameplay:
   - **Week:** Top scores from the past 7 days
   - **Month:** Top scores from the past 30 days
   - **All Time:** Top scores since the game launched
-- **Save Character:** (If logged in) Save your hero for future runs.
 - **My Profile:** (If logged in) View your lifetime statistics, personal achievements, and recent game history.
 - **Exit/Restart:** Use the in-game option to exit your current run and start over.
 - **Help/Guide:** Click the Help button to view the in-game guide explaining races, classes, controls, and advanced mechanics like Bleed and Guard encounters.
@@ -172,7 +171,7 @@ The project is organized with a clear separation of concerns:
 - **`src/App.jsx`** - Main application entry point and state management
 - **`src/gameData.js`** - Game configuration: races, classes, locations, upgrades, events, and item definitions
 - **`src/screens/`** - Main screen components for different game states:
-  - `StartScreen.jsx` - Character creation, race/class selection, saved character loading, and dynamic leaderboard with time filters
+  - `StartScreen.jsx` - Race/class selection, dynamic leaderboard with time filters, and login interface
   - `GameScreen.jsx` - Main gameplay loop with market/inventory tabs, travel mechanics, combat encounters, and event handling
   - `ProfileScreen.jsx` - User profile with lifetime statistics, game history, and gamer tag management
   - `GameOverScreen.jsx` - End-of-game summary with score calculation and database logging
