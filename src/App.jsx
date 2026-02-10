@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { RACES, CLASSES, EVENTS, LOCATIONS, UPGRADES, BASE_PRICES, validateName } from './gameData'
+import { RACES, CLASSES, LOCATIONS, UPGRADES, BASE_PRICES } from './gameData'
 import { supabase } from './supabaseClient'
 
 // Import Screens
@@ -13,7 +13,6 @@ import GamerTagModal from './screens/GamerTagModal';
 function App() {
   // --- STATE ---
   const [session, setSession] = useState(null);
-  const [savedChars, setSavedChars] = useState([]);
   const [gameState, setGameState] = useState('start'); 
   const [leaderboard, setLeaderboard] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -21,9 +20,11 @@ function App() {
   const [splash, setSplash] = useState(true);
   const [userProfile, setUserProfile] = useState(null);
   const [showTagModal, setShowTagModal] = useState(false);
+  const [eventPool, setEventPool] = useState([]);
 
-  // Player
-  const [player, setPlayer] = useState({ name: '', race: null, class: null });
+  // Player (Name removed)
+  const [player, setPlayer] = useState({ race: null, class: null });
+  
   const [maxInventory, setMaxInventory] = useState(100);
   const [maxHealth, setMaxHealth] = useState(100);
   const [health, setHealth] = useState(100);
@@ -54,12 +55,12 @@ function App() {
   // --- INIT & AUTH ---
   useEffect(() => {
     fetchLeaderboard();
+    fetchEvents();
 
     const initSession = async () => {
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
         if (session) {
-            fetchSavedCharacters();
             checkProfile(session.user.id);
         }
     };
@@ -68,10 +69,8 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
-          fetchSavedCharacters();
           checkProfile(session.user.id);
       } else {
-          setSavedChars([]);
           setUserProfile(null);
       }
     });
@@ -79,6 +78,12 @@ function App() {
     const timer = setTimeout(() => setSplash(false), 2500);
     return () => { subscription.unsubscribe(); clearTimeout(timer); };
   }, []);
+
+  const fetchEvents = async () => {
+    const { data, error } = await supabase.from('game_events').select('*').eq('is_active', true);
+    if (error) console.error("Error loading events:", error);
+    else setEventPool(data || []);
+  };
 
   const checkProfile = async (userId) => {
       const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
@@ -91,18 +96,13 @@ function App() {
   };
 
   const handleGoogleLogin = async () => await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
-  const handleLogout = async () => { await supabase.auth.signOut(); setPlayer({ name: '', race: null, class: null }); };
+  const handleLogout = async () => { await supabase.auth.signOut(); setPlayer({ race: null, class: null }); };
 
   // --- DATA FETCHING ---
   const fetchLeaderboard = async () => {
     const { data } = await supabase.from('high_scores').select('*').order('final_score', { ascending: false }).limit(500);
-    if (data) {
-        const clean = data.map(e => validateName(e.player_name) ? { ...e, player_name: "Banned Goblin" } : e);
-        setLeaderboard(clean);
-    }
+    if (data) setLeaderboard(data);
   };
-  
-  const fetchSavedCharacters = async () => { const { data } = await supabase.from('saved_characters').select('*'); if (data) setSavedChars(data); };
   
   const fetchProfile = async () => {
     if (!session) return;
@@ -124,23 +124,19 @@ function App() {
     }
   };
 
-  const saveNewCharacter = async () => {
-    if (!session) return;
-    if (validateName(player.name)) return alert("Invalid Name");
-    const { error } = await supabase.from('saved_characters').insert([{ user_id: session.user.id, name: player.name, race_id: player.race.id, class_id: player.class.id }]);
-    if (!error) { alert("Character Saved!"); fetchSavedCharacters(); }
-  };
-
-  const deleteCharacter = async (e, id) => {
-    e.stopPropagation(); if (!window.confirm("Banish this hero?")) return;
-    const { error } = await supabase.from('saved_characters').delete().eq('id', id);
-    if (!error) setSavedChars(savedChars.filter(char => char.id !== id));
-  };
-
   const saveScore = async () => {
-    const scorerName = userProfile?.gamertag || 'Anonymous';
+    const scorerName = userProfile?.gamertag || 'Guest';
     setIsSaving(true);
-    await supabase.from('high_scores').insert([{ player_name: player.name, gamertag: scorerName, race: player.race.name, class: player.class.name, gold: resources.money, debt: debt, final_score: resources.money - debt }]);
+    // Note: We use the Gamertag as the player_name now
+    await supabase.from('high_scores').insert([{ 
+        player_name: scorerName, 
+        gamertag: scorerName, 
+        race: player.race.name, 
+        class: player.class.name, 
+        gold: resources.money, 
+        debt: debt, 
+        final_score: resources.money - debt 
+    }]);
     setIsSaving(false);
     fetchLeaderboard();
   };
@@ -150,15 +146,14 @@ function App() {
     const finalScore = Math.max(0, rawScore);
     const sessionData = {
         user_email: session?.user?.email || 'Anonymous',
-        char_name: player.name,
+        char_name: userProfile?.gamertag || 'Guest', // Log Gamertag instead of Character Name
         race: player.race?.name,
         class: player.class?.name,
         score: finalScore,
         status: status,
         days_survived: day,
         upgrades: playerItems.map(i => i.name),
-        combat_stats: { ...combatStats, dragons_killed: dragonsKilled, cause_of_death: cause }, 
-        gamertag: userProfile?.gamertag || null
+        combat_stats: { ...combatStats, dragons_killed: dragonsKilled, cause_of_death: cause }
     };
 
     try {
@@ -183,17 +178,14 @@ function App() {
     }
   };
 
-  // --- HELPER: PRICE CALCULATOR (Spread Logic) ---
+  // --- HELPER: PRICE CALCULATOR ---
   const getBuyPrice = (basePrice) => {
       const buyMod = player.race?.stats.buyMod || 0;
-      // You buy at 100% (minus race discount)
       return Math.ceil(basePrice * (1.0 - buyMod));
   };
 
   const getSellPrice = (basePrice) => {
       const sellMod = player.race?.stats.sellMod || 0;
-      // You sell at 80% (plus race bonus) -> The Shopkeeper's Spread
-      // This prevents "Buy for 100, Sell for 100" loops.
       return Math.floor(basePrice * 0.80 * (1.0 + sellMod));
   };
 
@@ -201,25 +193,32 @@ function App() {
   const updateMoney = (amount) => { setResources(prev => ({ ...prev, money: Math.max(0, prev.money + amount) })); };
 
   // --- GAME LOGIC ---
-  const loadCharacter = (char) => {
-    const raceObj = RACES.find(r => r.id === char.race_id);
-    const classObj = CLASSES.find(c => c.id === char.class_id);
-    setPlayer({ name: char.name, race: raceObj, class: classObj });
-  };
 
   const startGame = () => {
-    if (validateName(player.name)) return alert("Invalid Name");
-    if(!player.race || !player.class) return alert("Complete your character!");
+    // 1. Handle Randomization
+    let selectedRace = player.race;
+    let selectedClass = player.class;
 
-    let inv = 50 + player.race.stats.inventory;
-    let hp = 100 + player.race.stats.health;
-    let def = player.race.id === 'orc' ? 5 : 0;
-    if (player.class.id === 'warrior') hp += 50;
+    if (!selectedRace) {
+        selectedRace = RACES[Math.floor(Math.random() * RACES.length)];
+    }
+    if (!selectedClass) {
+        selectedClass = CLASSES[Math.floor(Math.random() * CLASSES.length)];
+    }
+
+    // 2. Set State
+    setPlayer({ race: selectedRace, class: selectedClass });
+
+    // 3. Initialize Stats
+    let inv = 50 + selectedRace.stats.inventory;
+    let hp = 100 + selectedRace.stats.health;
+    let def = selectedRace.id === 'orc' ? 5 : 0;
+    if (selectedClass.id === 'warrior') hp += 50;
     
     const initialInv = {};
     Object.keys(BASE_PRICES).forEach(key => initialInv[key] = { count: 0, avg: 0 });
-    setResources({ money: player.class.startingMoney, inventory: initialInv });
-    setDebt(player.class.startingDebt);
+    setResources({ money: selectedClass.startingMoney, inventory: initialInv });
+    setDebt(selectedClass.startingDebt);
     setMaxInventory(inv); setMaxHealth(hp); setHealth(hp); setDefense(def);
     setPlayerItems([]); setCombatBonus(0); setDragonsKilled(0);
     setCombatStats({ wins: 0, losses: 0, flees: 0 });
@@ -229,7 +228,7 @@ function App() {
     const startLoc = LOCATIONS[0];
     setCurrentLocation(startLoc);
     recalcPrices(startLoc);
-    setLog([`Welcome ${player.name}...`, "Good luck."]);
+    setLog([`Welcome ${userProfile?.gamertag || 'Wanderer'}...`, "Good luck."]);
     setGameState('playing');
   };
 
@@ -255,7 +254,7 @@ function App() {
   };
 
   const triggerRandomEvent = (locObj) => {
-    // BLEED CHECK
+    setEventMsg(null); 
     setHealth(h => {
         const threshold = Math.floor(maxHealth * 0.25);
         if (h < threshold) {
@@ -268,10 +267,8 @@ function App() {
         return h;
     });
 
-    // RISK CHECK
     if (Math.random() > locObj.risk) return recalcPrices(locObj);
 
-        // 1. Calculate Net Worth FIRST
     const inventoryValue = Object.keys(resources.inventory).reduce((total, item) => {
         const count = resources.inventory[item]?.count || 0;
         const price = getSellPrice(currentPrices[item] || 0); 
@@ -279,34 +276,30 @@ function App() {
     }, 0);
     const netWorth = resources.money + inventoryValue;
 
-    // 2. Filter the pool: Remove Guards by default
-    let eventPool = EVENTS.filter(e => e.id !== 'guards');
+    let validEvents = eventPool.filter(e => netWorth >= (e.req_net_worth || 0));
 
-    // 3. Add Guards ONLY if Rich (> 1 Million)
+    if (validEvents.length === 0) return recalcPrices(locObj);
+
     if (netWorth > 1000000) {
-        const guardEvent = EVENTS.find(e => e.id === 'guards');
-        // Add them multiple times to make them the dominant threat at high levels
-        eventPool.push(guardEvent);
-        eventPool.push(guardEvent); 
-    }
-    const event = eventPool[Math.floor(Math.random() * eventPool.length)];
-
-    // COMBAT EVENT Setup
-    if (event.combatStats) {
-        // Clone stats to avoid modifying constant data
-        let stats = { ...event.combatStats };
-
-        // Scale Guard Stats if Rich
-        if (event.id === 'guards' && netWorth > 1000000) {
-             stats.damage = 50; // Elite Guards
-             stats.difficulty = 16;
+        const guardEvent = validEvents.find(e => e.slug === 'guards');
+        if (guardEvent) {
+            validEvents.push(guardEvent);
+            validEvents.push(guardEvent);
         }
+    }
 
+    const event = validEvents[Math.floor(Math.random() * validEvents.length)];
+
+    if (event.type === 'combat') {
+        let stats = event.config; 
+        if (event.slug === 'guards' && netWorth > 1000000) {
+             stats = { ...stats, damage: 50, difficulty: 16 };
+        }
         setCombatEvent({
-            name: stats.name,
+            name: stats.enemy,
             text: event.text,
             damage: stats.damage,
-            goldLoss: stats.goldLoss,
+            goldLoss: stats.gold_loss_pct,
             difficulty: stats.difficulty
         });
         return recalcPrices(locObj); 
@@ -315,12 +308,10 @@ function App() {
     let msg = event.text;
     let eventPriceMod = 1.0;
     switch(event.type) {
-        case 'heal': setHealth(h => Math.min(h + event.value, maxHealth)); triggerFlash('green'); msg += ` (+${event.value} HP)`; break;
-        case 'money': updateMoney(event.value); triggerFlash('gold'); msg += ` (+${event.value} G)`; break;
-        case 'price': eventPriceMod = event.value; break;
-        case 'flavor': 
-            setHealth(h => Math.min(h + 1, maxHealth));
-            break;
+        case 'heal': setHealth(h => Math.min(h + event.config.value, maxHealth)); triggerFlash('green'); msg += ` (+${event.config.value} HP)`; break;
+        case 'money': updateMoney(event.config.value); triggerFlash('gold'); msg += ` (+${event.config.value} G)`; break;
+        case 'price': eventPriceMod = event.config.value; break;
+        case 'flavor': setHealth(h => Math.min(h + 1, maxHealth)); break;
         default: break;
     }
     setEventMsg({ text: msg, type: event.type });
@@ -360,7 +351,6 @@ function App() {
 
       const total = d20Roll + combatBonus + (player.race.stats.combat || 0) + racialBonus;
       
-      // CRITICAL SUCCESS (Nat 20)
       if (d20Roll === 20) {
           triggerFlash('gold');
           setLog(prev => [`CRITICAL HIT! You obliterated the ${combatEvent.name}!`, ...prev]);
@@ -369,21 +359,18 @@ function App() {
           if (combatEvent.name === 'Dragon') setDragonsKilled(d => d + 1);
           setCombatStats(prev => ({ ...prev, wins: prev.wins + 1 }));
       }
-      // CRITICAL FAILURE (Nat 1)
       else if (d20Roll === 1) {
           triggerFlash('red');
-          // Simplified Crit Fail Logic for readability
           const dmg = combatEvent.damage * 1.5;
           setHealth(h => {
              const newH = h - Math.max(0, dmg - defense);
              if (newH <= 0) setTimeout(() => triggerGameOver(combatEvent.name), 500);
              return newH;
           });
-          if (combatEvent.goldLoss > 0) setResources(prev => ({...prev, money: Math.floor(prev.money * 0.5)})); // Lose 50% on Crit Fail
+          if (combatEvent.goldLoss > 0) setResources(prev => ({...prev, money: Math.floor(prev.money * 0.5)})); 
           setLog(prev => [`CRIT FAIL! Disaster strikes!`, ...prev]);
           setCombatStats(prev => ({ ...prev, losses: prev.losses + 1 }));
       }
-      // NORMAL WIN
       else if (total >= combatEvent.difficulty) {
           triggerFlash('gold');
           setLog(prev => [`VICTORY! Rolled ${d20Roll} (+${total - d20Roll}) vs DC ${combatEvent.difficulty}.`, ...prev]);
@@ -391,7 +378,6 @@ function App() {
           if (combatEvent.name === 'Dragon' && player.race.id !== 'kobold') setDragonsKilled(d => d + 1);
           setCombatStats(prev => ({ ...prev, wins: prev.wins + 1 }));
       } 
-      // NORMAL LOSS
       else {
           const mitigatedDmg = Math.max(0, combatEvent.damage - defense);
           setHealth(h => {
@@ -556,21 +542,22 @@ function App() {
         />
       )}
 
-      {gameState === 'start' && <StartScreen player={player} setPlayer={setPlayer} session={session} savedChars={savedChars} leaderboard={leaderboard} onLogin={handleGoogleLogin} onLogout={handleLogout} onStart={startGame} onSave={saveNewCharacter} onDelete={deleteCharacter} onLoad={loadCharacter} onShowProfile={fetchProfile} onShowHelp={() => setGameState('help')} userProfile={userProfile} />}
+      {/* UPDATED: Pass userProfile (gamertag) instead of player.name */}
+      {gameState === 'start' && <StartScreen player={player} setPlayer={setPlayer} session={session} leaderboard={leaderboard} onLogin={handleGoogleLogin} onLogout={handleLogout} onStart={startGame} onShowProfile={fetchProfile} onShowHelp={() => setGameState('help')} userProfile={userProfile} />}
       
       {gameState === 'profile' && <ProfileScreen profileData={profileData} onClose={() => setGameState('start')} userProfile={userProfile}  onEditTag={() => setShowTagModal(true)}/>}
       
       {gameState === 'help' && <HelpScreen onClose={() => setGameState('start')} />}
 
-      {/* UPDATED: Passing Race to GameOverScreen */}
       {gameState === 'gameover' && <GameOverScreen money={resources.money} debt={debt} health={health} race={player.race?.name} isSaving={isSaving} onRestart={() => setGameState('start')} />}
       
+      {/* UPDATED: Pass gamertag explicitly */}
       {gameState === 'playing' && <GameScreen 
+          gamertag={userProfile?.gamertag || 'Wanderer'} // New Prop
           player={player} day={day} maxDays={MAX_DAYS} location={currentLocation} resources={resources} health={health} maxHealth={maxHealth} debt={debt} 
           currentPrices={currentPrices} log={log} eventMsg={eventMsg} flash={flash} combatEvent={combatEvent} isRolling={isRolling} rollTarget={rollTarget}
           playerItems={playerItems} onPayDebt={payDebt} onTravel={handleEndTurn} onRestart={() => { if(window.confirm("Restart?")) { logGameSession('Quit (Restart)'); startGame(); }}} 
           onQuit={() => { if(window.confirm("Quit?")) { logGameSession('Quit (Menu)'); setGameState('start'); }}} 
-          // UPDATED: Passing Price Helpers and new Actions
           getBuyPrice={getBuyPrice}
           getSellPrice={getSellPrice}
           onBuy={buyItem} 

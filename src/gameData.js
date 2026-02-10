@@ -141,42 +141,6 @@ export const UPGRADES = [
     { id: 'elixir', name: 'Elixir of Life', type: 'heal', value: 0.75, cost: 10000, desc: "Heals 75% HP" }
 ];
 
-export const EVENTS = [
-  { 
-      id: 'dragon', 
-      text: "A Dragon attacks!", 
-      type: 'damage', 
-      combatStats: { name: "Dragon", damage: 60, difficulty: 18, goldLoss: 0 }
-  },
-  { 
-    id: 'mugger', 
-    text: "Spin the Goblin bumps into you!", 
-    type: 'theft', 
-    combatStats: { name: "Spin the Goblin", damage: 20, difficulty: 12, goldLoss: 0.10 }
-  },
-  { 
-      id: 'guards', 
-      text: "The City Watch recognizes you!", 
-      type: 'guard_encounter', 
-      // Base stats - these scale in App.jsx
-      combatStats: { name: "City Watch", damage: 30, difficulty: 14, goldLoss: 0.25 }
-  },
-    { 
-    id: 'healer', 
-    text: "Johann the Cleric blesses your journey.", 
-    type: 'heal', 
-    value: 25 
-  },
-  { id: 'find',   text: "You find a coin purse.", type: 'money', value: 200 },
-  { id: 'sale',   text: "Market Crash!", type: 'price', value: 0.5 },
-  { id: 'riot',   text: "Riots! Prices high.", type: 'price', value: 2.0 },
-  { id: 'rain', text: "A heavy rainstorm slows your travel.", type: 'flavor', value: 0 },
-  { id: 'bards', text: "A troupe of bards sings of your exploits.", type: 'flavor', value: 0 },
-  { id: 'ruins', text: "You pass ancient dwarven ruins.", type: 'flavor', value: 0 },
-  { id: 'wolf', text: "You hear a wolf howl in the distance.", type: 'flavor', value: 0 },
-  { id: 'cart', text: "You fix a broken wheel on your cart.", type: 'flavor', value: 0 }
-];
-
 // --- PROFANITY FILTER ---
 filter.loadDictionary('en');
 const STRICT_BAN_LIST = [

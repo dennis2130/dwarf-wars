@@ -7,8 +7,9 @@ import ScrambleDie from '../components/ScrambleDie';
 import { getIcon } from '../utils';
 import { UPGRADES } from '../gameData';
 
+// NEW PROP: gamertag
 export default function GameScreen({ 
-    player, day, maxDays, location, resources, health, maxHealth, debt, 
+    gamertag, player, day, maxDays, location, resources, health, maxHealth, debt, 
     currentPrices, log, eventMsg, flash, combatEvent, isRolling, rollTarget,
     playerItems, onPayDebt, onTravel, onRestart, onQuit, 
     onBuy, onSell, onBuyMax, onSellAll, onBuyUpgrade, getBuyPrice, getSellPrice,
@@ -20,7 +21,11 @@ export default function GameScreen({
         <div className="min-h-screen bg-slate-900 text-slate-200 font-sans p-2 max-w-md mx-auto border-x border-slate-700 flex flex-col relative">
             {/* HEADER */}
             <header className="flex justify-between items-start mb-4 border-b border-slate-700 pb-2">
-                <div><h1 className="text-xl font-bold text-yellow-500">{player.name}</h1><p className="text-xs text-slate-400 capitalize">{player.race?.name} {player.class?.name}</p></div>
+                <div>
+                    {/* NEW: Gamertag Display */}
+                    <h1 className="text-xl font-bold text-yellow-500">{gamertag}</h1>
+                    <p className="text-xs text-slate-400 capitalize">{player.race?.name} {player.class?.name}</p>
+                </div>
                 <div className="flex flex-col items-end gap-1">
                     <div className="text-right text-sm"><span className="text-white font-bold mr-2">Day {day}/{maxDays}</span><span className="text-xs text-blue-400 inline-flex items-center gap-1"><Map size={12}/>{location.name}</span></div>
                     <div className="flex gap-2 mt-1">
