@@ -61,7 +61,7 @@ export default function GameOverScreen({ money, debt, health, race, isSaving, on
             // Edge Case: Paid off debt, but died (e.g. from bleed or last fight)
             scenario.title = "MARTYR'S VICTORY";
             scenario.icon = <Skull size={64} className="text-yellow-500" />;
-            scenario.description = `You fell in battle, but you died a free ${race.name}.`;
+            scenario.description = `You fell in battle, but you died a free ${race}.`;
             scenario.quote = "\"Your debts are paid. Your clan sings songs of your honor.\"";
         } else {
             // Standard Win

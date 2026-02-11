@@ -190,9 +190,22 @@ export default function GameScreen({
                                     Rolled {checkEvent.result.roll} + Bonus = {checkEvent.result.total}
                                 </div>
 
-                                <p className="text-white text-lg mb-8 italic">
-                                    "{checkEvent.result.text}"
-                                </p>
+                                <div className="space-y-4 mb-8">
+                                    <p className="text-white text-lg italic">
+                                        "{checkEvent.result.text}"
+                                    </p>
+
+                                    {/* NEW: EFFECT SUMMARY BOX */}
+                                    {checkEvent.result.effectText && (
+                                        <div className={`p-3 rounded border text-sm font-bold animate-pulse ${
+                                            checkEvent.result.outcome.includes('success') 
+                                            ? 'bg-green-900/30 border-green-800 text-green-300' 
+                                            : 'bg-red-900/30 border-red-800 text-red-300'
+                                        }`}>
+                                            {checkEvent.result.effectText}
+                                        </div>
+                                    )}
+                                </div>
 
                                 <button 
                                     onClick={onCloseCheck}

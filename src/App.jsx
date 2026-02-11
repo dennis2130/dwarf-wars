@@ -156,6 +156,7 @@ function App() {
     const sessionData = {
         user_email: session?.user?.email || 'Anonymous',
         char_name: userProfile?.gamertag || 'Guest', // Log Gamertag instead of Character Name
+        gamertag: currentTag, 
         race: player.race?.name,
         class: player.class?.name,
         score: finalScore,
@@ -233,6 +234,11 @@ function App() {
     setCombatStats({ wins: 0, losses: 0, flees: 0 });
     setDay(1);
     setHasTraded(false);
+    setCombatEvent(null);
+    setCheckEvent(null);
+    setEventMsg(null);
+    setIsRolling(false);
+    setRollTarget(null);
     
     const startLoc = LOCATIONS[0];
     setCurrentLocation(startLoc);
@@ -285,11 +291,27 @@ function App() {
     }, 0);
     const netWorth = resources.money + inventoryValue;
 
-    let validEvents = eventPool.filter(e => netWorth >= (e.req_net_worth || 0));
+        // 2. Filter Pool based on Net Worth AND Config Constraints
+    let validEvents = eventPool.filter(e => {
+        const conf = e.config || {};
+        
+        // Net Worth Check
+        if (netWorth < (e.req_net_worth || 0)) return false;
+
+        // Debt Check (New)
+        if (conf.req_debt && debt <= 0) return false;
+
+        // Day Range Check (New)
+        if (conf.req_min_day && day < conf.req_min_day) return false;
+        if (conf.req_max_day && day > conf.req_max_day) return false;
+
+        return true;
+    });
 
     // --- DEBUG: FORCE TROLL EVENT ---
     // Uncomment this line to test the logic, then delete it!
      //validEvents = validEvents.filter(e => e.slug === 'troll_bridge' || e.slug === 'dragon');    
+     validEvents = validEvents.filter(e => e.slug === 'goon_squad');
     // --------------------------------
 
     if (validEvents.length === 0) return recalcPrices(locObj);
@@ -393,13 +415,17 @@ function App() {
 
 // --- NEW: GENERIC OUTCOME HANDLER ---
   const applyOutcomeEffect = (effect) => {
+      let summary = [];
+
       // 1. Handle Gold (Flat or Percent)
-      if (effect.gold) updateMoney(effect.gold);
+      if (effect.gold) {
+          updateMoney(effect.gold);
+          summary.push(`${effect.gold > 0 ? '+' : ''}${effect.gold}g`);
+      }
       if (effect.gold_pct) {
-          setResources(prev => {
-              const delta = Math.floor(prev.money * effect.gold_pct);
-              return { ...prev, money: Math.max(0, prev.money + delta) };
-          });
+          const delta = Math.floor(resources.money * effect.gold_pct);
+          updateMoney(delta);
+          summary.push(`${delta > 0 ? '+' : ''}${delta}g`);
       }
 
       // 2. Handle Health
@@ -409,43 +435,80 @@ function App() {
               if (newH <= 0) setTimeout(() => triggerGameOver("Event Death"), 500);
               return newH;
           });
+          summary.push(`${effect.health > 0 ? '+' : ''}${effect.health} HP`);
       }
 
-      // 3. Handle Items (Add/Remove)
+      // 3. Handle Items
       if (effect.add_item) {
+          const item = effect.add_item;
+          const count = effect.amount || 1;
           setResources(prev => {
-              const item = effect.add_item;
-              const count = effect.amount || 1;
               const currentInv = prev.inventory;
-              // Only add if space
               const totalItems = Object.values(currentInv).reduce((a, b) => a + b.count, 0);
               if (totalItems + count <= maxInventory) {
                   return {
                       ...prev,
                       inventory: {
                           ...currentInv,
-                          [item]: { 
-                              ...currentInv[item], 
-                              count: currentInv[item].count + count,
-                              // If adding free item, avg cost goes down slightly (optional math, ignored for simplicity)
-                              avg: currentInv[item].avg 
-                          }
+                          [item]: { ...currentInv[item], count: currentInv[item].count + count }
                       }
                   };
               }
-              return prev; // No space, lose item
+              return prev;
           });
+          summary.push(`+${count} ${item}`);
       }
 
       if (effect.remove_all_item) {
           setResources(prev => ({
               ...prev,
-              inventory: {
-                  ...prev.inventory,
-                  [effect.remove_all_item]: { count: 0, avg: 0 }
-              }
+              inventory: { ...prev.inventory, [effect.remove_all_item]: { count: 0, avg: 0 } }
           }));
+          summary.push(`Lost all ${effect.remove_all_item}`);
       }
+
+      // 4. Special Outcomes
+      if (effect.zero_gold) {
+          setResources(prev => ({ ...prev, money: 0 }));
+          summary.push("Lost ALL Gold");
+      }
+      if (effect.clear_inventory) {
+          setResources(prev => {
+              const emptyInv = {};
+              Object.keys(prev.inventory).forEach(k => emptyInv[k] = { count: 0, avg: 0 });
+              return { ...prev, inventory: emptyInv };
+          });
+          summary.push("Inventory Stripped");
+      }
+      if (effect.clear_debt) {
+          setDebt(0);
+          triggerFlash('green');
+          summary.push("Debt Cleared!");
+      }
+
+      // 5. Force Pay or Hurt (FIXED: Logic moved outside setResources)
+      if (effect.force_pay_or_hurt) {
+          const { interest_pct, damage } = effect.force_pay_or_hurt;
+          const totalOwed = Math.floor(debt * (1.0 + interest_pct));
+          
+          // Check current resources state directly
+          if (resources.money >= totalOwed) {
+              setDebt(0);
+              updateMoney(-totalOwed);
+              triggerFlash('red');
+              summary.push(`Forced to pay ${totalOwed}g`);
+          } else {
+              setHealth(h => {
+                  const newH = h - damage;
+                  if (newH <= 0) setTimeout(() => triggerGameOver("Debt Collection"), 500);
+                  return newH;
+              });
+              triggerFlash('red');
+              summary.push(`Took ${damage} Damage`);
+          }
+      }
+
+      return summary.join(", ");
   };
 
 
@@ -600,59 +663,43 @@ const handleCheckRollComplete = () => {
     }, 800);
 };
 
-const finishCheck = (d20) => {
-    if (!checkEvent) return;
+    const finishCheck = (d20) => {
+        if (!checkEvent) return;
 
-    const config = checkEvent.config;
-
-        let bonus = 0;
+        const config = checkEvent.config;
         
-        switch (config.stat) {
-            case 'combat':
-                bonus = combatBonus + (player.race.stats.combat || 0);
-                break;
-            case 'negotiation':
-                // Example: Merchants, Bards, and Elves get +5 to talk their way out of things
-                if (['merchant', 'bard'].includes(player.class.id)) bonus += 5;
-                if (player.race.id === 'elf') bonus += 3;
-                break;
-            case 'luck':
-                // Halflings get +5 Luck
-                if (player.race.id === 'halfling') bonus += 5;
-                break;
-            default:
-                bonus = 0; // Default for unknown stats
-        }
+        let bonus = 0;
+        if (config.stat === 'combat') bonus = combatBonus + (player.race.stats.combat || 0);
+        // ... (other stats if added)
         
         const total = d20 + bonus;
 
-    // 2. Determine Outcome
-    let outcomeKey = 'fail';
-    if (d20 === 20) outcomeKey = 'crit_success';
-    else if (d20 === 1) outcomeKey = 'crit_fail';
-    else if (total >= config.difficulty) outcomeKey = 'success';
+        let outcomeKey = 'fail';
+        if (d20 === 20) outcomeKey = 'crit_success';
+        else if (d20 === 1) outcomeKey = 'crit_fail';
+        else if (total >= config.difficulty) outcomeKey = 'success';
 
-    const outcomeData = config.outcomes[outcomeKey];
+        const outcomeData = config.outcomes[outcomeKey];
 
-    // 3. Apply Effects
-    applyOutcomeEffect(outcomeData.effect); // <--- Uses the helper we made earlier
+        // CAPTURE THE TEXT RESULT
+        const effectText = applyOutcomeEffect(outcomeData.effect); 
 
-    // 4. Update UI to show Result
-    const logText = `[${config.stat.toUpperCase()}] Rolled ${d20} + ${bonus} vs DC ${config.difficulty}. ${outcomeKey.toUpperCase()}!`;
-    setLog(prev => [logText, ...prev]);
-    triggerFlash(outcomeKey.includes('success') ? 'gold' : 'red');
+        const logText = `[${config.stat.toUpperCase()}] Rolled ${d20} + ${bonus} vs DC ${config.difficulty}. ${outcomeKey.toUpperCase()}!`;
+        setLog(prev => [logText, ...prev]);
+        triggerFlash(outcomeKey.includes('success') ? 'gold' : 'red');
 
-    // Update the modal to show the result text instead of the intro text
-    setCheckEvent(prev => ({
-        ...prev,
-        result: {
-            outcome: outcomeKey,
-            text: outcomeData.text,
-            roll: d20,
-            total: total
-        }
-    }));
-};
+        // PASS TEXT TO MODAL
+        setCheckEvent(prev => ({
+            ...prev,
+            result: {
+                outcome: outcomeKey,
+                text: outcomeData.text,
+                effectText: effectText, // <--- New Field
+                roll: d20,
+                total: total
+            }
+        }));
+    };
 
 const closeCheckModal = () => {
     setCheckEvent(null);
@@ -722,24 +769,45 @@ const closeCheckModal = () => {
 
   const buyUpgrade = (upgrade) => {
     if (resources.money < upgrade.cost) return setLog(prev => ["Too expensive!", ...prev]);
+    
+    // HEAL LOGIC
     if (upgrade.type === 'heal') {
         if (health >= maxHealth) return setLog(prev => ["You are healthy!", ...prev]);
         const healAmount = Math.floor(maxHealth * upgrade.value);
         setHealth(h => Math.min(h + healAmount, maxHealth));
         setResources(prev => ({ ...prev, money: prev.money - upgrade.cost }));
-        triggerFlash('green'); return;
+        triggerFlash('green'); 
+        return;
     }
+
+    // DUPLICATE CHECK
     if (playerItems.find(i => i.id === upgrade.id)) return setLog(prev => ["Already own!", ...prev]);
+
     let newItems = [...playerItems];
     let currentCombatBonus = combatBonus;
+
+    // --- WEAPON SWAP CHECK (The Fix) ---
     if (upgrade.type === 'combat') {
         const oldWeapon = newItems.find(i => i.type === 'combat');
-        if (oldWeapon) { currentCombatBonus -= oldWeapon.value; newItems = newItems.filter(i => i.id !== oldWeapon.id); }
+        if (oldWeapon) {
+            // Confirm Dialog
+            const confirmSwap = window.confirm(`You are carrying a ${oldWeapon.name}. Drop it to equip the ${upgrade.name}?`);
+            if (!confirmSwap) return; // User cancelled
+
+            // Remove old bonus and item
+            currentCombatBonus -= oldWeapon.value;
+            newItems = newItems.filter(i => i.id !== oldWeapon.id);
+            setLog(prev => [`Dropped ${oldWeapon.name}.`, ...prev]);
+        }
         setCombatBonus(currentCombatBonus + upgrade.value);
     } 
+    // -----------------------------------
+
     if (upgrade.type === 'inventory') setMaxInventory(m => m + upgrade.value);
+    
     setResources(prev => ({ ...prev, money: prev.money - upgrade.cost }));
     setPlayerItems([...newItems, upgrade]);
+    setLog(prev => [`Bought ${upgrade.name}.`, ...prev]);
   };
 
   const payDebt = () => {
