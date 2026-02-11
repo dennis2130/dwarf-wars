@@ -156,7 +156,7 @@ function App() {
     const sessionData = {
         user_email: session?.user?.email || 'Anonymous',
         char_name: userProfile?.gamertag || 'Guest', // Log Gamertag instead of Character Name
-        gamertag: currentTag, 
+        gamertag:  userProfile?.gamertag,  
         race: player.race?.name,
         class: player.class?.name,
         score: finalScore,
