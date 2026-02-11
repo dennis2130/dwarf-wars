@@ -297,33 +297,48 @@ function App() {
 
         // 2. Filter Pool based on Net Worth AND Config Constraints
         let validEvents = eventPool.filter(e => {
-        const conf = e.config || {};
-        
-        // Net Worth Check
-        if (netWorth < (e.req_net_worth || 0)) return false;
-
-        // Debt Check (New)
-        if (conf.req_debt && debt <= 0) return false;
-
-        // Day Range Check (New)
-        if (conf.req_min_day && day < conf.req_min_day) return false;
+        const conf = e.config || {};        
+        if (netWorth < (e.req_net_worth || 0)) return false; // Net Worth Check    
+        if (conf.req_debt && debt <= 0) return false; // Debt Check (New)
+        if (conf.req_min_day && day < conf.req_min_day) return false;  // Day Range Check (New)
         if (conf.req_max_day && day > conf.req_max_day) return false;
-
         return true;
     });
 
+
+
     if (validEvents.length === 0) return recalcPrices(locObj);
 
-    if (netWorth > 1000000) {
-        const guardEvent = validEvents.find(e => e.slug === 'guards');
-        if (guardEvent) {
-            validEvents.push(guardEvent);
-            validEvents.push(guardEvent);
+    // --- NEW: WEIGHTED SELECTION LOGIC ---
+    
+    // Create a "lottery ticket" array. 
+    // If an event has weight 3, it gets 3 tickets.
+    const weightedPool = [];
+    validEvents.forEach(e => {
+        // Default to 1 if null
+        const weight = e.risk_weight || 1; 
+        for (let i = 0; i < weight; i++) {
+            weightedPool.push(e);
         }
-    }
+        
+        // Hardcoded Boost: Make "Guards" extremely common if Wanted
+        // (This replaces the old array push logic you had)
+        if (e.slug === 'guards' && netWorth > 1000000) {
+            for(let i=0; i<3; i++) weightedPool.push(e);
+        }
+    });
 
+    // --- Check Event Pool ---
+    console.log("Current Event Deck:", weightedPool.map(e => e.slug));
+    // --------------------------
 
-    const event = validEvents[Math.floor(Math.random() * validEvents.length)];
+    // Pick a random ticket
+    const event = weightedPool[Math.floor(Math.random() * weightedPool.length)];
+    
+    // DEBUG: Check the odds in your console
+    console.log(`Event Triggered. Pool Size: ${weightedPool.length}. Selected: ${event.slug}`);
+
+    // -------------------------------------
 
     // Handle Event Types
     // 1. Combat Event
