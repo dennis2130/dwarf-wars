@@ -22,7 +22,10 @@ function App() {
   const [showTagModal, setShowTagModal] = useState(false);
   const [eventPool, setEventPool] = useState([]);
 
-  // Player (Name removed)
+  // NEW: Stores the Start Screen selection (Null = Random)
+  const [buildSelection, setBuildSelection] = useState({ race: null, class: null });
+
+  // Player (Active Game Character)
   const [player, setPlayer] = useState({ race: null, class: null });
   
   const [maxInventory, setMaxInventory] = useState(100);
@@ -72,13 +75,10 @@ function App() {
       if (session) {
           checkProfile(session.user.id);
           
-          // --- FIX: Clean the URL hash so we don't try to use the token twice ---
-          // This removes the #access_token=... junk from the address bar
           if (window.location.hash && window.location.hash.includes('access_token')) {
               const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
               window.history.replaceState({}, document.title, newUrl);
           }
-          // ---------------------------------------------------------------------
       } else {
           setUserProfile(null);
       }
@@ -105,7 +105,12 @@ function App() {
   };
 
   const handleGoogleLogin = async () => await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
-  const handleLogout = async () => { await supabase.auth.signOut(); setPlayer({ race: null, class: null }); };
+  
+  const handleLogout = async () => { 
+      await supabase.auth.signOut(); 
+      setPlayer({ race: null, class: null });
+      setBuildSelection({ race: null, class: null }); // Reset UI selection too
+  };
 
   // --- DATA FETCHING ---
   const fetchLeaderboard = async () => {
@@ -136,7 +141,6 @@ function App() {
   const saveScore = async () => {
     const scorerName = userProfile?.gamertag || 'Guest';
     setIsSaving(true);
-    // Note: We use the Gamertag as the player_name now
     await supabase.from('high_scores').insert([{ 
         player_name: scorerName, 
         gamertag: scorerName, 
@@ -155,7 +159,7 @@ function App() {
     const finalScore = Math.max(0, rawScore);
     const sessionData = {
         user_email: session?.user?.email || 'Anonymous',
-        char_name: userProfile?.gamertag || 'Guest', // Log Gamertag instead of Character Name
+        char_name: userProfile?.gamertag || 'Guest',
         gamertag:  userProfile?.gamertag,  
         race: player.race?.name,
         class: player.class?.name,
@@ -205,9 +209,9 @@ function App() {
   // --- GAME LOGIC ---
 
   const startGame = () => {
-    // 1. Handle Randomization
-    let selectedRace = player.race;
-    let selectedClass = player.class;
+    // 1. Handle Randomization (Reads from buildSelection now!)
+    let selectedRace = buildSelection.race;
+    let selectedClass = buildSelection.class;
 
     if (!selectedRace) {
         selectedRace = RACES[Math.floor(Math.random() * RACES.length)];
@@ -216,7 +220,7 @@ function App() {
         selectedClass = CLASSES[Math.floor(Math.random() * CLASSES.length)];
     }
 
-    // 2. Set State
+    // 2. Set State (Updates Active Player, leaves buildSelection alone)
     setPlayer({ race: selectedRace, class: selectedClass });
 
     // 3. Initialize Stats
@@ -292,7 +296,7 @@ function App() {
     const netWorth = resources.money + inventoryValue;
 
         // 2. Filter Pool based on Net Worth AND Config Constraints
-    let validEvents = eventPool.filter(e => {
+        let validEvents = eventPool.filter(e => {
         const conf = e.config || {};
         
         // Net Worth Check
@@ -308,12 +312,6 @@ function App() {
         return true;
     });
 
-    // --- DEBUG: FORCE TROLL EVENT ---
-    // Uncomment this line to test the logic, then delete it!
-     //validEvents = validEvents.filter(e => e.slug === 'troll_bridge' || e.slug === 'dragon');    
-     //validEvents = validEvents.filter(e => e.slug === 'goon_squad');
-    // --------------------------------
-
     if (validEvents.length === 0) return recalcPrices(locObj);
 
     if (netWorth > 1000000) {
@@ -323,6 +321,7 @@ function App() {
             validEvents.push(guardEvent);
         }
     }
+
 
     const event = validEvents[Math.floor(Math.random() * validEvents.length)];
 
@@ -521,10 +520,7 @@ const finishCombat = (d20Roll) => {
 
       const total = d20Roll + combatBonus + (player.race.stats.combat || 0) + racialBonus;
       
-      let outcome = '';
-      let title = '';
-      let flavorText = '';
-      let lootText = ''; // To store loot results
+      let outcome = '', title = '', flavorText = '', lootText = '';
 
       // --- 1. CRITICAL SUCCESS ---
       if (d20Roll === 20) {
@@ -769,42 +765,30 @@ const closeCheckModal = () => {
 
   const buyUpgrade = (upgrade) => {
     if (resources.money < upgrade.cost) return setLog(prev => ["Too expensive!", ...prev]);
-    
-    // HEAL LOGIC
     if (upgrade.type === 'heal') {
         if (health >= maxHealth) return setLog(prev => ["You are healthy!", ...prev]);
         const healAmount = Math.floor(maxHealth * upgrade.value);
         setHealth(h => Math.min(h + healAmount, maxHealth));
         setResources(prev => ({ ...prev, money: prev.money - upgrade.cost }));
-        triggerFlash('green'); 
-        return;
+        triggerFlash('green'); return;
     }
-
-    // DUPLICATE CHECK
     if (playerItems.find(i => i.id === upgrade.id)) return setLog(prev => ["Already own!", ...prev]);
-
+    
     let newItems = [...playerItems];
     let currentCombatBonus = combatBonus;
 
-    // --- WEAPON SWAP CHECK (The Fix) ---
     if (upgrade.type === 'combat') {
         const oldWeapon = newItems.find(i => i.type === 'combat');
         if (oldWeapon) {
-            // Confirm Dialog
             const confirmSwap = window.confirm(`You are carrying a ${oldWeapon.name}. Drop it to equip the ${upgrade.name}?`);
-            if (!confirmSwap) return; // User cancelled
-
-            // Remove old bonus and item
+            if (!confirmSwap) return; 
             currentCombatBonus -= oldWeapon.value;
             newItems = newItems.filter(i => i.id !== oldWeapon.id);
             setLog(prev => [`Dropped ${oldWeapon.name}.`, ...prev]);
         }
         setCombatBonus(currentCombatBonus + upgrade.value);
     } 
-    // -----------------------------------
-
     if (upgrade.type === 'inventory') setMaxInventory(m => m + upgrade.value);
-    
     setResources(prev => ({ ...prev, money: prev.money - upgrade.cost }));
     setPlayerItems([...newItems, upgrade]);
     setLog(prev => [`Bought ${upgrade.name}.`, ...prev]);
@@ -857,8 +841,8 @@ const closeCheckModal = () => {
         />
       )}
 
-      {/* UPDATED: Pass userProfile (gamertag) instead of player.name */}
-      {gameState === 'start' && <StartScreen player={player} setPlayer={setPlayer} session={session} leaderboard={leaderboard} onLogin={handleGoogleLogin} onLogout={handleLogout} onStart={startGame} onShowProfile={fetchProfile} onShowHelp={() => setGameState('help')} userProfile={userProfile} />}
+      {/* UPDATED: Pass buildSelection to StartScreen to preserve menu choice */}
+      {gameState === 'start' && <StartScreen player={buildSelection} setPlayer={setBuildSelection} session={session} leaderboard={leaderboard} onLogin={handleGoogleLogin} onLogout={handleLogout} onStart={startGame} onShowProfile={fetchProfile} onShowHelp={() => setGameState('help')} userProfile={userProfile} />}
       
       {gameState === 'profile' && <ProfileScreen profileData={profileData} onClose={() => setGameState('start')} userProfile={userProfile}  onEditTag={() => setShowTagModal(true)}/>}
       
@@ -866,11 +850,10 @@ const closeCheckModal = () => {
 
       {gameState === 'gameover' && <GameOverScreen money={resources.money} debt={debt} health={health} race={player.race?.name} isSaving={isSaving} onRestart={() => setGameState('start')} />}
       
-      {/* UPDATED: Pass gamertag explicitly */}
       {gameState === 'playing' && <GameScreen 
-          gamertag={userProfile?.gamertag || 'Wanderer'} // New Prop
+          gamertag={userProfile?.gamertag || 'Wanderer'} 
           player={player} day={day} maxDays={MAX_DAYS} location={currentLocation} resources={resources} health={health} maxHealth={maxHealth} debt={debt} 
-          currentPrices={currentPrices} log={log} eventMsg={eventMsg} flash={flash} combatEvent={combatEvent} isRolling={isRolling} rollTarget={rollTarget}
+          currentPrices={currentPrices} log={log} eventMsg={eventMsg} flash={flash} combatEvent={combatEvent} checkEvent={checkEvent} isRolling={isRolling} rollTarget={rollTarget}
           playerItems={playerItems} onPayDebt={payDebt} onTravel={handleEndTurn} onRestart={() => { if(window.confirm("Restart?")) { logGameSession('Quit (Restart)'); startGame(); }}} 
           onQuit={() => { if(window.confirm("Quit?")) { logGameSession('Quit (Menu)'); setGameState('start'); }}} 
           getBuyPrice={getBuyPrice}
@@ -881,12 +864,11 @@ const closeCheckModal = () => {
           onSellAll={sellAll}
           onBuyUpgrade={buyUpgrade} 
           combatActions={{ onRollComplete: handleRollComplete, onRun: resolveRunAway, onFight: startCombatRoll, bonus: combatBonus + (player.race.stats.combat || 0) }}
-          onCloseCombat={closeCombatModal} 
           onWork={doOddJob} hasTraded={hasTraded}
-          checkEvent={checkEvent}
           onCheckRoll={startCheckRoll}
           onCheckComplete={handleCheckRollComplete}
           onCloseCheck={closeCheckModal}
+          onCloseCombat={closeCombatModal}
       />}
     </>
   );
