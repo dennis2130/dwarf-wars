@@ -311,7 +311,7 @@ function App() {
     // --- DEBUG: FORCE TROLL EVENT ---
     // Uncomment this line to test the logic, then delete it!
      //validEvents = validEvents.filter(e => e.slug === 'troll_bridge' || e.slug === 'dragon');    
-     validEvents = validEvents.filter(e => e.slug === 'goon_squad');
+     //validEvents = validEvents.filter(e => e.slug === 'goon_squad');
     // --------------------------------
 
     if (validEvents.length === 0) return recalcPrices(locObj);
