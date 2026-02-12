@@ -83,6 +83,19 @@ The travel mechanic triggers random events that affect gameplay:
 - **Guard Encounter** - Triggered when net worth exceeds 1 million gold; difficulty scales with wealth
 - **Goblin Mugger (Spin)** - Pickpocket event that steals 10% of current gold
 
+### Skill Check Events
+- Ability checks that test your character's chosen stat (combat, wisdom, etc.)
+- Roll a D20 and add your bonus vs a difficulty check (DC)
+- Critical Successes (Nat 20) and Critical Failures (Nat 1) with dramatic outcomes
+
+### Unified Event Modal
+- **Single Component for All Checks**: EventModal handles both combat and skill check events with dynamic theming
+  - Combat events display with red styling and a sword icon
+  - Skill checks display with blue styling and a target icon
+- **Sophisticated Roll System**: Uses cryptographic randomization for fair D20 rolls with real-time dice animation
+- **Outcome-Based Effects**: Dynamic text and game state changes based on success/failure with visual feedback
+- **Racial & Class Bonuses**: Combat and check bonuses factored in automatically (e.g., Kobolds get +5 vs Dragons, Halflings get +5 vs Guards)
+
 ### Positive Events
 - **Cleric's Blessing (Johann)** - Restores 25 health to the player
 - **Found Coin Purse** - Grants 200 gold
@@ -133,13 +146,20 @@ The travel mechanic triggers random events that affect gameplay:
 
 ## Controls
 
-- **Market Tab:** Buy and sell items. Hold down the buy/sell buttons to continuously purchase or sell items.
-  - **Buy Button:** Purchase one item per click or hold to buy repeatedly.
-  - **Sell Button:** Sell one item per click or hold to sell repeatedly.
-  - **MAX Button:** Intelligently buys or sells the maximum amount based on your available gold, inventory space, or current stock.
-- **Armory & Stables Tab:** Purchase upgrades (inventory, weapons, consumables).
-- **Travel Button:** Move to a new location and trigger events.
-- **Combat Encounters:** Roll a D20 die with your combat bonus and attempt to defeat enemies. The ScrambleDie animates the outcome.
+- **Market Tab:** Buy and sell items. Long-press the buy/sell buttons to continuously purchase or sell items.
+  - **Buy Button:** Purchase one item per click. Long-press for continuous buying.
+  - **Sell Button:** Sell one item per click. Long-press for continuous selling.
+  - **MAX Button:** Buy the maximum amount based on your available gold and inventory space.
+  - **ALL Button:** Sell all items of a type instantly.
+  - **Profit Color Coding:** Sell prices turn green if selling above your average cost, red if below.
+- **Armory & Stables Tab:** Purchase permanent upgrades (inventory, weapons, defense, consumables).
+- **Travel Button:** Move to a new location and trigger random events.
+- **Combat & Skill Checks:** When triggered, a unified modal appears for both combat encounters and skill checks.
+  - Roll a D20 die using cryptographic randomization with your character's bonus applied.
+  - For combat: Combat stats + racial bonuses (Kobolds +5 vs Dragons, Halflings +5 vs Guards).
+  - Success/Failure determined by comparing roll total against difficulty check (DC).
+  - Critical Successes (Nat 20) and Critical Failures (Nat 1) with dramatic outcomes and special effects.
+  - For combat only: "Run Away" button to flee with a 10 HP penalty. The ScrambleDie animates the outcome.
 - **Pay Debt:** Click on the "Pay" link next to your debt to pay it off.
 - **Leaderboard Filters:** On the start screen, view the global leaderboard filtered by time period:
   - **Today:** Top scores from the past 24 hours
@@ -179,8 +199,9 @@ The project is organized with a clear separation of concerns:
   - `GamerTagModal.jsx` - Modal for setting/editing player gamer tags with profanity validation
 - **`src/components/`** - Reusable React components:
   - `StatsBar.jsx` - Displays player health, gold, inventory capacity, active location, day counter, and combat stats
-  - `InventoryGrid.jsx` - Visual inventory management with item counts and price tracking
-  - `MarketItem.jsx` - Individual tradeable item with buy/sell buttons and long-press support
+  - `InventoryGrid.jsx` - Visual inventory management with item icons, count displays, and dynamic full-inventory warning
+  - `MarketItem.jsx` - Enhanced tradeable item display with long-press buy/sell support, MAX/ALL buttons for bulk transactions, profit color coding (green for profit, red for loss), and improved compact layout
+  - `EventModal.jsx` - Unified event handler for combat and skill checks with animated D20 dice rolls, outcome-based effects, and dynamic theming (red for combat, blue for checks)
   - `ScrambleDie.jsx` - Animated D20 dice roll component with combat result visualization
 - **`src/hooks/`** - Custom React hooks:
   - `useLongPress.js` - Handles long-press interactions for continuous buy/sell actions with global event listeners to properly detect finger/mouse lift anywhere on screen
