@@ -1,20 +1,23 @@
 import { useState } from 'react';
-import { Map, RotateCcw, LogOut, Shield, ShoppingBag, Sword, FlaskConical, Swords, Target } from 'lucide-react';
+import { Map, RotateCcw, LogOut, Shield, ShoppingBag, Sword, FlaskConical } from 'lucide-react';
 import StatsBar from '../components/StatsBar';
 import InventoryGrid from '../components/InventoryGrid';
 import MarketItem from '../components/MarketItem';
-import ScrambleDie from '../components/ScrambleDie';
 import { getIcon } from '../utils';
 import { UPGRADES } from '../gameData';
+import EventModal from '../components/EventModal';
 
 export default function GameScreen({ 
     gamertag, player, day, maxDays, location, resources, health, maxHealth, debt, 
-    currentPrices, log, eventMsg, flash, combatEvent, checkEvent, 
+    currentPrices, log, eventMsg, flash, 
+    activeEvent, // Unified Event State
     isRolling, rollTarget,
     playerItems, onPayDebt, onTravel, onRestart, onQuit, 
     onBuy, onSell, onBuyMax, onSellAll, onBuyUpgrade, getBuyPrice, getSellPrice,
-    combatActions, hasTraded,
-    onCheckRoll, onCheckComplete, onCloseCheck, onCloseCombat 
+    combatActions, hasTraded, 
+    onRoll, // Generic Roll Handler (startRoll)
+    onClose, // Generic Close Handler (closeEventModal)
+    onWork 
 }) {
     const [activeTab, setActiveTab] = useState('market');
 
@@ -33,17 +36,16 @@ export default function GameScreen({
                 {/* CENTER: Day Counter */}
                 <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col items-center">
                     <div className="text-[10px] text-white uppercase tracking-widest font-bold">Day</div>
-                    {/* key={day} forces the animation to re-run every time day changes */}
-                    <div key={day} className="text-2xl font-black text-white leading-none animate-in zoom-in fade-in duration-300">
+                    <div key={day} className="text-3xl font-black text-white leading-none animate-in zoom-in fade-in duration-300">
                         {day}/{maxDays}
                     </div>
                 </div>
 
                 {/* RIGHT: Location & Actions */}
                 <div className="flex flex-col items-end gap-1 z-10">
-                    <div className="text-s text-blue-400 inline-flex items-center gap-1 font-bold">
+                    <div className="text-xs text-blue-400 inline-flex items-center gap-1 font-bold">
                         <Map size={14}/>
-                        <span className="truncate max-w-[115px] text-right">{location.name}</span>
+                        <span className="truncate max-w-[100px] text-right">{location.name}</span>
                     </div>
                     <div className="flex gap-2 mt-1">
                         <button onClick={onRestart} className="p-1 rounded bg-slate-800 text-slate-400 hover:text-green-400 border border-slate-700"><RotateCcw size={14} /></button>
@@ -53,8 +55,15 @@ export default function GameScreen({
             </header>
 
             {/* EVENT MSG */}
-            {eventMsg && <div className={`mb-4 p-3 rounded text-center text-sm font-bold border ${eventMsg.type === 'damage' || eventMsg.type === 'theft' || eventMsg.type === 'bad' ? 'bg-red-900/50 border-red-500 text-red-200' : 'bg-green-900/50 border-green-500 text-green-200'}`}>{eventMsg.text}</div>}
-
+            {eventMsg && (
+                <div className={`mb-4 p-3 rounded text-center text-sm font-bold border ${
+                    eventMsg.type === 'good' 
+                    ? 'bg-green-900/50 border-green-500 text-green-200' 
+                    : 'bg-red-900/50 border-red-500 text-red-200'
+                }`}>
+                    {eventMsg.text}
+                </div>
+            )}
             <StatsBar money={resources.money} debt={debt} health={health} maxHealth={maxHealth} onPayDebt={onPayDebt} />
 
             {/* TABS */}
@@ -149,148 +158,19 @@ export default function GameScreen({
             {/* SCREEN FLASH */}
             <div className={`fixed inset-0 pointer-events-none transition-opacity duration-300 ${flash === 'red' ? 'bg-red-500/30' : flash === 'green' ? 'bg-green-500/30' : flash === 'gold' ? 'bg-yellow-500/30' : 'opacity-0'}`}></div>
 
-            {/* SKILL CHECK MODAL */}
-            {checkEvent && (
-                <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
-                    <div className={`rounded-xl p-6 w-full max-w-sm text-center shadow-2xl border-2 animate-in zoom-in duration-200 ${checkEvent.result ? (checkEvent.result.outcome.includes('success') ? 'bg-slate-900 border-green-500' : 'bg-slate-900 border-red-500') : 'bg-slate-900 border-blue-500'}`}>
-                        
-                        <h2 className="text-xl font-bold mb-4 text-white uppercase tracking-widest">
-                            {checkEvent.config.stat} CHECK
-                        </h2>
-
-                        {!checkEvent.result ? (
-                            <>
-                                <p className="text-slate-300 mb-8 text-lg leading-relaxed">
-                                    "{checkEvent.text}"
-                                </p>
-                                
-                                <div className="h-32 flex items-center justify-center mb-6">
-                                    {isRolling && rollTarget ? (
-                                        <ScrambleDie target={rollTarget} onComplete={onCheckComplete} />
-                                    ) : (
-                                        <Target size={80} className="text-blue-500 animate-pulse" strokeWidth={1.5} />
-                                    )}
-                                </div>
-
-                                <button 
-                                    onClick={onCheckRoll} 
-                                    disabled={isRolling}
-                                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl shadow-lg disabled:opacity-50"
-                                >
-                                    {isRolling ? "ROLLING..." : `ROLL D20 (DC ${checkEvent.config.difficulty})`}
-                                </button>
-                            </>
-                        ) : (
-                            <>
-                                <div className={`text-4xl font-black mb-2 ${checkEvent.result.outcome.includes('success') ? 'text-green-400' : 'text-red-500'}`}>
-                                    {checkEvent.result.outcome.replace('_', ' ').toUpperCase()}
-                                </div>
-                                
-                                <div className="text-xs text-slate-500 font-mono mb-6">
-                                    Rolled {checkEvent.result.roll} + Bonus = {checkEvent.result.total}
-                                </div>
-
-                                <div className="space-y-4 mb-8">
-                                    <p className="text-white text-lg italic">
-                                        "{checkEvent.result.text}"
-                                    </p>
-
-                                    {/* NEW: EFFECT SUMMARY BOX */}
-                                    {checkEvent.result.effectText && (
-                                        <div className={`p-3 rounded border text-sm font-bold animate-pulse ${
-                                            checkEvent.result.outcome.includes('success') 
-                                            ? 'bg-green-900/30 border-green-800 text-green-300' 
-                                            : 'bg-red-900/30 border-red-800 text-red-300'
-                                        }`}>
-                                            {checkEvent.result.effectText}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <button 
-                                    onClick={onCloseCheck}
-                                    className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-4 rounded-xl"
-                                >
-                                    CONTINUE JOURNEY
-                                </button>
-                            </>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* COMBAT MODAL */}
-            {combatEvent && (
-                <div className="fixed inset-0 z-40 bg-black/90 flex items-center justify-center p-4">
-                    <div className={`rounded-xl p-6 w-full max-w-sm text-center shadow-2xl border-2 animate-in zoom-in duration-200 ${combatEvent.result ? (combatEvent.result.outcome.includes('success') || combatEvent.result.outcome === 'win' ? 'bg-slate-900 border-green-500' : 'bg-slate-900 border-red-500') : 'bg-slate-900 border-red-500'}`}>
-                        
-                        <h2 className="text-2xl text-white font-bold mb-2 uppercase tracking-widest">
-                            {combatEvent.name} ATTACK!
-                        </h2>
-
-                        {!combatEvent.result ? (
-                            <>
-                                <p className="text-slate-300 mb-6">{combatEvent.text}</p>
-                                
-                                <div className="h-32 flex items-center justify-center mb-4">
-                                    {isRolling && rollTarget ? (
-                                        <ScrambleDie target={rollTarget} onComplete={combatActions.onRollComplete} />
-                                    ) : (
-                                        <Swords size={80} className="text-red-500 animate-pulse" strokeWidth={1.5} />
-                                    )}
-                                </div>
-
-                                <div className="flex gap-3">
-                                    <button onClick={combatActions.onRun} disabled={isRolling} className="flex-1 bg-slate-700 hover:bg-slate-600 border border-slate-500 text-slate-200 py-3 rounded disabled:opacity-50 font-bold">
-                                        {combatEvent.goldLoss > 0 ? "Surrender" : "Run Away"}
-                                    </button>
-                                    <button onClick={combatActions.onFight} disabled={isRolling} className="flex-1 bg-red-700 hover:bg-red-600 text-white font-bold py-3 rounded flex flex-col items-center justify-center disabled:opacity-50 shadow-lg shadow-red-900/50">
-                                        {isRolling ? (
-                                            <span>ROLLING...</span>
-                                        ) : (
-                                            <>
-                                                <span>FIGHT!</span>
-                                                <span className="text-[10px] font-normal opacity-80">
-                                                    Roll D20 + {combatActions.bonus} vs DC {combatEvent.difficulty}
-                                                </span>
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div className={`text-4xl font-black mb-2 uppercase ${combatEvent.result.outcome.includes('success') || combatEvent.result.outcome === 'win' ? 'text-green-400' : 'text-red-500'}`}>
-                                    {combatEvent.result.title}
-                                </div>
-                                
-                                <div className="text-xs text-slate-500 font-mono mb-6">
-                                    Rolled {combatEvent.result.roll} + Bonus = {combatEvent.result.total}
-                                </div>
-
-                                <div className="space-y-4 mb-8">
-                                    <p className="text-white text-lg italic">
-                                        "{combatEvent.result.text}"
-                                    </p>
-                                    
-                                    {combatEvent.result.loot && (
-                                        <div className="bg-green-900/30 p-3 rounded border border-green-800 text-green-300 text-sm font-bold animate-pulse">
-                                            {combatEvent.result.loot}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <button 
-                                    onClick={onCloseCombat}
-                                    className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-4 rounded-xl shadow-lg"
-                                >
-                                    CONTINUE JOURNEY
-                                </button>
-                            </>
-                        )}
-                    </div>
-                </div>
-            )}
+            {/* UNIFIED EVENT MODAL */}
+            <EventModal 
+                event={activeEvent} 
+                isRolling={isRolling}
+                rollTarget={rollTarget}
+                onRoll={onRoll} 
+                onClose={onClose}
+                combatActions={{
+                    onRollComplete: combatActions.onRollComplete,
+                    onRun: combatActions.onRun,
+                    bonus: combatActions.bonus
+                }}
+            />
         </div>
     );
 }

@@ -22,12 +22,11 @@ function App() {
   const [showTagModal, setShowTagModal] = useState(false);
   const [eventPool, setEventPool] = useState([]);
 
-  // NEW: Stores the Start Screen selection (Null = Random)
+  // Selections
   const [buildSelection, setBuildSelection] = useState({ race: null, class: null });
-
-  // Player (Active Game Character)
   const [player, setPlayer] = useState({ race: null, class: null });
   
+  // Game Stats
   const [maxInventory, setMaxInventory] = useState(100);
   const [maxHealth, setMaxHealth] = useState(100);
   const [health, setHealth] = useState(100);
@@ -37,7 +36,7 @@ function App() {
   const [dragonsKilled, setDragonsKilled] = useState(0);
   const [combatStats, setCombatStats] = useState({ wins: 0, losses: 0, flees: 0 });
 
-  // Game Loop
+  // Resources
   const [resources, setResources] = useState({ money: 100, inventory: {} });
   const [debt, setDebt] = useState(5000);
   const [day, setDay] = useState(1);
@@ -48,11 +47,10 @@ function App() {
   const [flash, setFlash] = useState(''); 
   const [hasTraded, setHasTraded] = useState(false);
 
-  // Combat UI
-  const [combatEvent, setCombatEvent] = useState(null); 
+  // --- UNIFIED EVENT STATE (Replaces combatEvent/checkEvent) ---
+  const [activeEvent, setActiveEvent] = useState(null); 
   const [isRolling, setIsRolling] = useState(false);
   const [rollTarget, setRollTarget] = useState(null);
-  const [checkEvent, setCheckEvent] = useState(null);
 
   const MAX_DAYS = 31;
 
@@ -74,7 +72,6 @@ function App() {
       setSession(session);
       if (session) {
           checkProfile(session.user.id);
-          
           if (window.location.hash && window.location.hash.includes('access_token')) {
               const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
               window.history.replaceState({}, document.title, newUrl);
@@ -109,10 +106,9 @@ function App() {
   const handleLogout = async () => { 
       await supabase.auth.signOut(); 
       setPlayer({ race: null, class: null });
-      setBuildSelection({ race: null, class: null }); // Reset UI selection too
+      setBuildSelection({ race: null, class: null });
   };
 
-  // --- DATA FETCHING ---
   const fetchLeaderboard = async () => {
     const { data } = await supabase.from('high_scores').select('*').order('final_score', { ascending: false }).limit(500);
     if (data) setLeaderboard(data);
@@ -157,10 +153,12 @@ function App() {
   const logGameSession = async (status, cause = null) => {
     const rawScore = resources.money - debt;
     const finalScore = Math.max(0, rawScore);
+    const currentTag = userProfile?.gamertag || 'Guest';
+
     const sessionData = {
         user_email: session?.user?.email || 'Anonymous',
-        char_name: userProfile?.gamertag || 'Guest',
-        gamertag:  userProfile?.gamertag,  
+        char_name: currentTag,
+        gamertag: currentTag,
         race: player.race?.name,
         class: player.class?.name,
         score: finalScore,
@@ -206,24 +204,122 @@ function App() {
   const triggerFlash = (color) => { setFlash(color); setTimeout(() => setFlash(''), 300); };
   const updateMoney = (amount) => { setResources(prev => ({ ...prev, money: Math.max(0, prev.money + amount) })); };
 
+  // --- HELPER: EVENT OUTCOMES ---
+  const applyOutcomeEffect = (effect) => {
+      let summary = [];
+
+      // Gold
+      if (effect.gold) {
+          updateMoney(effect.gold);
+          summary.push(`${effect.gold > 0 ? '+' : ''}${effect.gold}g`);
+      }
+      if (effect.gold_pct) {
+          const delta = Math.floor(resources.money * effect.gold_pct);
+          updateMoney(delta);
+          summary.push(`${delta > 0 ? '+' : ''}${delta}g`);
+      }
+
+      // Health
+      if (effect.health) {
+          setHealth(h => {
+              const newH = Math.min(h + effect.health, maxHealth);
+              if (newH <= 0) setTimeout(() => triggerGameOver("Event Death"), 500);
+              return newH;
+          });
+          summary.push(`${effect.health > 0 ? '+' : ''}${effect.health} HP`);
+      }
+
+      // Items
+      if (effect.add_item) {
+          const item = effect.add_item;
+          const count = effect.amount || 1;
+          setResources(prev => {
+              const currentInv = prev.inventory;
+              const totalItems = Object.values(currentInv).reduce((a, b) => a + b.count, 0);
+              if (totalItems + count <= maxInventory) {
+                  return {
+                      ...prev,
+                      inventory: {
+                          ...currentInv,
+                          [item]: { ...currentInv[item], count: currentInv[item].count + count }
+                      }
+                  };
+              }
+              return prev;
+          });
+          summary.push(`+${count} ${item}`);
+      }
+
+      if (effect.remove_all_item) {
+          setResources(prev => ({
+              ...prev,
+              inventory: { ...prev.inventory, [effect.remove_all_item]: { count: 0, avg: 0 } }
+          }));
+          summary.push(`Lost all ${effect.remove_all_item}`);
+      }
+
+      // Special
+      if (effect.zero_gold) {
+          setResources(prev => ({ ...prev, money: 0 }));
+          summary.push("Lost ALL Gold");
+      }
+      if (effect.clear_inventory) {
+          setResources(prev => {
+              const emptyInv = {};
+              Object.keys(prev.inventory).forEach(k => emptyInv[k] = { count: 0, avg: 0 });
+              return { ...prev, inventory: emptyInv };
+          });
+          summary.push("Inventory Stripped");
+      }
+      if (effect.clear_debt) {
+          setDebt(0);
+          triggerFlash('green');
+          summary.push("Debt Cleared!");
+      }
+
+      // Debt/Hurt Logic
+      if (effect.force_pay_or_hurt) {
+          const { interest_pct, damage } = effect.force_pay_or_hurt;
+          const totalOwed = Math.floor(debt * (1.0 + interest_pct));
+          
+          if (resources.money >= totalOwed) {
+              setDebt(0);
+              updateMoney(-totalOwed);
+              triggerFlash('red');
+              summary.push(`Forced to pay ${totalOwed}g`);
+          } else {
+              setHealth(h => {
+                  const newH = h - damage;
+                  if (newH <= 0) setTimeout(() => triggerGameOver("Debt Collection"), 500);
+                  return newH;
+              });
+              triggerFlash('red');
+              summary.push(`Took ${damage} Damage`);
+          }
+      }
+
+      return summary.join(", ");
+  };
+
   // --- GAME LOGIC ---
 
   const startGame = () => {
-    // 1. Handle Randomization (Reads from buildSelection now!)
-    let selectedRace = buildSelection.race;
+    // 1. Reset Event State
+    setActiveEvent(null);
+    setEventMsg(null);
+    setIsRolling(false);
+    setRollTarget(null);
+
+    // 2. Handle Randomization
+    let selectedRace = buildSelection.race; 
     let selectedClass = buildSelection.class;
 
-    if (!selectedRace) {
-        selectedRace = RACES[Math.floor(Math.random() * RACES.length)];
-    }
-    if (!selectedClass) {
-        selectedClass = CLASSES[Math.floor(Math.random() * CLASSES.length)];
-    }
+    if (!selectedRace) selectedRace = RACES[Math.floor(Math.random() * RACES.length)];
+    if (!selectedClass) selectedClass = CLASSES[Math.floor(Math.random() * CLASSES.length)];
 
-    // 2. Set State (Updates Active Player, leaves buildSelection alone)
     setPlayer({ race: selectedRace, class: selectedClass });
 
-    // 3. Initialize Stats
+    // 3. Init Stats
     let inv = 50 + selectedRace.stats.inventory;
     let hp = 100 + selectedRace.stats.health;
     let def = selectedRace.id === 'orc' ? 5 : 0;
@@ -238,11 +334,6 @@ function App() {
     setCombatStats({ wins: 0, losses: 0, flees: 0 });
     setDay(1);
     setHasTraded(false);
-    setCombatEvent(null);
-    setCheckEvent(null);
-    setEventMsg(null);
-    setIsRolling(false);
-    setRollTarget(null);
     
     const startLoc = LOCATIONS[0];
     setCurrentLocation(startLoc);
@@ -288,6 +379,7 @@ function App() {
 
     if (Math.random() > locObj.risk) return recalcPrices(locObj);
 
+    // Calculate Net Worth for Filters
     const inventoryValue = Object.keys(resources.inventory).reduce((total, item) => {
         const count = resources.inventory[item]?.count || 0;
         const price = getSellPrice(currentPrices[item] || 0); 
@@ -295,393 +387,114 @@ function App() {
     }, 0);
     const netWorth = resources.money + inventoryValue;
 
-        // 2. Filter Pool based on Net Worth AND Config Constraints
-        let validEvents = eventPool.filter(e => {
-        const conf = e.config || {};        
-        if (netWorth < (e.req_net_worth || 0)) return false; // Net Worth Check    
-        if (conf.req_debt && debt <= 0) return false; // Debt Check (New)
-        if (conf.req_min_day && day < conf.req_min_day) return false;  // Day Range Check (New)
+    // 1. FILTERING
+    let validEvents = eventPool.filter(e => {
+        const conf = e.config || {};
+        if (netWorth < (e.req_net_worth || 0)) return false;
+        if (conf.req_debt && debt <= 0) return false;
+        if (conf.req_min_day && day < conf.req_min_day) return false;
         if (conf.req_max_day && day > conf.req_max_day) return false;
         return true;
     });
 
-
-
     if (validEvents.length === 0) return recalcPrices(locObj);
 
-    // --- NEW: WEIGHTED SELECTION LOGIC ---
-    
-    // Create a "lottery ticket" array. 
-    // If an event has weight 3, it gets 3 tickets.
+    // 2. WEIGHTED SELECTION
     const weightedPool = [];
     validEvents.forEach(e => {
-        // Default to 1 if null
         const weight = e.risk_weight || 1; 
-        for (let i = 0; i < weight; i++) {
-            weightedPool.push(e);
-        }
-        
-        // Hardcoded Boost: Make "Guards" extremely common if Wanted
-        // (This replaces the old array push logic you had)
+        for (let i = 0; i < weight; i++) weightedPool.push(e);
         if (e.slug === 'guards' && netWorth > 1000000) {
-            for(let i=0; i<3; i++) weightedPool.push(e);
+            for(let i=0; i<10; i++) weightedPool.push(e);
         }
     });
 
-    // --- Check Event Pool ---
-    console.log("Current Event Deck:", weightedPool.map(e => e.slug));
-    // --------------------------
-
-    // Pick a random ticket
     const event = weightedPool[Math.floor(Math.random() * weightedPool.length)];
-    
-    // DEBUG: Check the odds in your console
-    console.log(`Event Triggered. Pool Size: ${weightedPool.length}. Selected: ${event.slug}`);
 
-    // -------------------------------------
-
-    // Handle Event Types
-    // 1. Combat Event
-    if (event.type === 'combat') {
-        let stats = event.config; 
-        if (event.slug === 'guards' && netWorth > 1000000) {
-             stats = { ...stats, damage: 50, difficulty: 16 };
-        }
-        setCombatEvent({
-            name: stats.enemy,
-            text: event.text,
-            damage: stats.damage,
-            goldLoss: stats.gold_loss_pct,
-            difficulty: stats.difficulty
-        });
-        return recalcPrices(locObj); 
-    }
-
-    // 2. Skill Check Event (New)
-
-    if (event.type === 'check') {
+    // 3. UNIFIED EVENT SETUP (Combat + Check)
+    if (event.type === 'combat' || event.type === 'check') {
+        let config = event.config;
         
-        setCheckEvent({
-            title: event.slug.replace('_', ' '), // simple cleanup
-            text: event.text,
-            config: event.config, // Contains difficulty, outcomes, stat
-            result: null // No result yet
+        // Handle Scaling
+        if (event.slug === 'guards' && netWorth > 1000000) {
+             config = { ...config, difficulty: 16 }; 
+        }
+
+        setActiveEvent({
+            ...event,
+            config: config,
+            result: null
         });
         return recalcPrices(locObj);
     }
 
-
+        // 4. SIMPLE EVENTS
     let msg = event.text;
     let eventPriceMod = 1.0;
+    
+    // NEW: Determine if it's good or bad
+    let msgType = 'neutral'; 
+
     switch(event.type) {
-        case 'heal': setHealth(h => Math.min(h + event.config.value, maxHealth)); triggerFlash('green'); msg += ` (+${event.config.value} HP)`; break;
-        case 'money': updateMoney(event.config.value); triggerFlash('gold'); msg += ` (+${event.config.value} G)`; break;
-        case 'price': eventPriceMod = event.config.value; break;
-        case 'flavor': setHealth(h => Math.min(h + 1, maxHealth)); break;
-        default: break;
+        case 'heal': 
+            setHealth(h => Math.min(h + event.config.value, maxHealth)); 
+            triggerFlash('green'); 
+            msg += ` (+${event.config.value} HP)`; 
+            msgType = 'good'; // <--- Explicitly Good
+            break;
+        case 'money': 
+            updateMoney(event.config.value); 
+            triggerFlash('gold'); 
+            msg += ` (+${event.config.value} G)`; 
+            msgType = 'good'; // <--- Explicitly Good
+            break;
+        case 'price': 
+            eventPriceMod = event.config.value; 
+            // Market Crash (0.5) is Good for buying? Bad for selling? 
+            // Usually events like "Market Crash" are neutral/alert info.
+            msgType = 'bad'; 
+            break;
+        case 'flavor': 
+            setHealth(h => Math.min(h + 1, maxHealth)); 
+            msgType = 'good'; // Minor heal is good
+            break;
+        default: 
+            msgType = 'bad'; // Default to Alert/Red
+            break;
     }
-    setEventMsg({ text: msg, type: event.type });
+
+    setEventMsg({ text: msg, type: msgType }); 
+
     setLog(prev => [msg, ...prev]);
     return recalcPrices(locObj, eventPriceMod);
   };
 
-  const startCombatRoll = () => {
-      // 1. Create a buffer for a random 32-bit integer
+  // --- UNIFIED ROLL HANDLERS ---
+  const startRoll = () => {
       const array = new Uint32Array(1);
-      
-      // 2. Fill it with cryptographically strong randomness from the OS
       window.crypto.getRandomValues(array);
-      
-      // 3. Modulo math: (RandomHugeNumber % 20) gives 0-19. Add 1 to get 1-20.
       const d20 = (array[0] % 20) + 1;
-      
       setRollTarget(d20);
       setIsRolling(true);
   };
 
   const handleRollComplete = () => {
-      setTimeout(() => { finishCombat(rollTarget); setIsRolling(false); setRollTarget(null); }, 800);
+      setTimeout(() => { finishEvent(rollTarget); setIsRolling(false); setRollTarget(null); }, 800);
   };
 
-  const generateLoot = (enemyType) => {
-    const tier = enemyType === 'Dragon' ? 5 : 1;
-    const roll = Math.random();
-    let lootMsg = "";
-    
-    if (roll < 0.5) {
-        const gold = 100 * tier * (Math.floor(Math.random() * 5) + 1);
-        updateMoney(gold); 
-        lootMsg = `Looted ${gold} gold coins.`;
-        triggerFlash('gold');
-    } else if (roll < 0.8) {
-        const heal = 10 * tier; 
-        setHealth(h => Math.min(h + heal, maxHealth)); 
-        lootMsg = `Found supplies. Healed ${heal} HP.`;
-        triggerFlash('green');
-    } else {
-        const slots = 2 * tier; 
-        setMaxInventory(m => m + slots); 
-        lootMsg = `Found a ${enemyType === 'Dragon' ? 'Chest' : 'Pouch'}. Inventory +${slots}.`;
-    }
-    setLog(prev => [lootMsg, ...prev]);
-    return lootMsg; // <--- RETURN THIS
-  };
-
-// --- NEW: GENERIC OUTCOME HANDLER ---
-  const applyOutcomeEffect = (effect) => {
-      let summary = [];
-
-      // 1. Handle Gold (Flat or Percent)
-      if (effect.gold) {
-          updateMoney(effect.gold);
-          summary.push(`${effect.gold > 0 ? '+' : ''}${effect.gold}g`);
-      }
-      if (effect.gold_pct) {
-          const delta = Math.floor(resources.money * effect.gold_pct);
-          updateMoney(delta);
-          summary.push(`${delta > 0 ? '+' : ''}${delta}g`);
-      }
-
-      // 2. Handle Health
-      if (effect.health) {
-          setHealth(h => {
-              const newH = Math.min(h + effect.health, maxHealth);
-              if (newH <= 0) setTimeout(() => triggerGameOver("Event Death"), 500);
-              return newH;
-          });
-          summary.push(`${effect.health > 0 ? '+' : ''}${effect.health} HP`);
-      }
-
-      // 3. Handle Items
-      if (effect.add_item) {
-          const item = effect.add_item;
-          const count = effect.amount || 1;
-          setResources(prev => {
-              const currentInv = prev.inventory;
-              const totalItems = Object.values(currentInv).reduce((a, b) => a + b.count, 0);
-              if (totalItems + count <= maxInventory) {
-                  return {
-                      ...prev,
-                      inventory: {
-                          ...currentInv,
-                          [item]: { ...currentInv[item], count: currentInv[item].count + count }
-                      }
-                  };
-              }
-              return prev;
-          });
-          summary.push(`+${count} ${item}`);
-      }
-
-      if (effect.remove_all_item) {
-          setResources(prev => ({
-              ...prev,
-              inventory: { ...prev.inventory, [effect.remove_all_item]: { count: 0, avg: 0 } }
-          }));
-          summary.push(`Lost all ${effect.remove_all_item}`);
-      }
-
-      // 4. Special Outcomes
-      if (effect.zero_gold) {
-          setResources(prev => ({ ...prev, money: 0 }));
-          summary.push("Lost ALL Gold");
-      }
-      if (effect.clear_inventory) {
-          setResources(prev => {
-              const emptyInv = {};
-              Object.keys(prev.inventory).forEach(k => emptyInv[k] = { count: 0, avg: 0 });
-              return { ...prev, inventory: emptyInv };
-          });
-          summary.push("Inventory Stripped");
-      }
-      if (effect.clear_debt) {
-          setDebt(0);
-          triggerFlash('green');
-          summary.push("Debt Cleared!");
-      }
-
-      // 5. Force Pay or Hurt (FIXED: Logic moved outside setResources)
-      if (effect.force_pay_or_hurt) {
-          const { interest_pct, damage } = effect.force_pay_or_hurt;
-          const totalOwed = Math.floor(debt * (1.0 + interest_pct));
-          
-          // Check current resources state directly
-          if (resources.money >= totalOwed) {
-              setDebt(0);
-              updateMoney(-totalOwed);
-              triggerFlash('red');
-              summary.push(`Forced to pay ${totalOwed}g`);
-          } else {
-              setHealth(h => {
-                  const newH = h - damage;
-                  if (newH <= 0) setTimeout(() => triggerGameOver("Debt Collection"), 500);
-                  return newH;
-              });
-              triggerFlash('red');
-              summary.push(`Took ${damage} Damage`);
-          }
-      }
-
-      return summary.join(", ");
-  };
-
-
-const finishCombat = (d20Roll) => {
-      if (!combatEvent) return;
-
-      let racialBonus = 0;
-      if (player.race.id === 'kobold' && combatEvent.name === 'Dragon') racialBonus = 5;
-      if (player.race.id === 'halfling' && combatEvent.name === 'City Watch') racialBonus = 5;
-
-      const total = d20Roll + combatBonus + (player.race.stats.combat || 0) + racialBonus;
-      
-      let outcome = '', title = '', flavorText = '', lootText = '';
-
-      // --- 1. CRITICAL SUCCESS ---
-      if (d20Roll === 20) {
-          outcome = 'crit_success';
-          title = 'CRITICAL HIT!';
-          flavorText = `You obliterated the ${combatEvent.name}!`;
-          triggerFlash('gold');
-          
-          if (combatEvent.name === 'Dragon') setDragonsKilled(d => d + 1);
-          setCombatStats(prev => ({ ...prev, wins: prev.wins + 1 }));
-          
-          // Double Loot
-          const l1 = generateLoot(combatEvent.name);
-          const l2 = generateLoot(combatEvent.name);
-          lootText = `${l1} ${l2}`;
-      }
-      // --- 2. CRITICAL FAILURE ---
-      else if (d20Roll === 1) {
-          outcome = 'crit_fail';
-          title = 'CRITICAL FAILURE';
-          triggerFlash('red');
-          
-          // Crit Fail Logic
-          const dmg = combatEvent.damage * 1.5;
-          setHealth(h => {
-             const newH = h - Math.max(0, dmg - defense);
-             if (newH <= 0) setTimeout(() => triggerGameOver(combatEvent.name), 500);
-             return newH;
-          });
-          
-          let failMsg = `You took ${Math.max(0, dmg - defense)} damage.`;
-
-          if (combatEvent.goldLoss > 0) {
-              setResources(prev => ({...prev, money: Math.floor(prev.money * 0.5)}));
-              failMsg += " Lost 50% of your gold!";
-          }
-          
-          flavorText = failMsg;
-          setCombatStats(prev => ({ ...prev, losses: prev.losses + 1 }));
-      }
-      // --- 3. NORMAL WIN ---
-      else if (total >= combatEvent.difficulty) {
-          outcome = 'win';
-          title = 'VICTORY';
-          flavorText = `You defeated the ${combatEvent.name}.`;
-          triggerFlash('gold');
-          
-          if (combatEvent.name === 'Dragon' && player.race.id !== 'kobold') setDragonsKilled(d => d + 1);
-          setCombatStats(prev => ({ ...prev, wins: prev.wins + 1 }));
-          
-          lootText = generateLoot(combatEvent.name);
-      } 
-      // --- 4. NORMAL LOSS ---
-      else {
-          outcome = 'loss';
-          title = 'DEFEAT';
-          
-          const mitigatedDmg = Math.max(0, combatEvent.damage - defense);
-          setHealth(h => {
-              const newH = h - mitigatedDmg;
-              if (newH <= 0) setTimeout(() => triggerGameOver(combatEvent.name), 500);
-              return newH;
-          });
-          
-          flavorText = `You took ${mitigatedDmg} damage.`;
-          
-          if (combatEvent.goldLoss > 0) {
-              setResources(prev => ({...prev, money: Math.floor(prev.money * (1 - combatEvent.goldLoss))}));
-              flavorText += " They took some of your gold.";
-          }
-          
-          triggerFlash('red');
-          setCombatStats(prev => ({ ...prev, losses: prev.losses + 1 }));
-      }
-
-      // Log it
-      setLog(prev => [`${title}: ${flavorText}`, ...prev]);
-
-      // UPDATE MODAL STATE INSTEAD OF CLOSING
-      setCombatEvent(prev => ({
-          ...prev,
-          result: {
-              outcome,
-              title,
-              text: flavorText,
-              loot: lootText,
-              roll: d20Roll,
-              total: total
-          }
-      }));
-  };
-
-  const closeCombatModal = () => {
-      setCombatEvent(null);
-  };
-
-
-
-  const resolveRunAway = () => {
-      if (!combatEvent) return;
-      if (combatEvent.goldLoss > 0) {
-          setResources(prev => ({...prev, money: Math.floor(prev.money * (1 - combatEvent.goldLoss))}));
-          setLog(prev => [`Paid off the ${combatEvent.name}.`, ...prev]);
-      } else {
-          setHealth(h => {
-              const newH = h - (combatEvent.damage / 2);
-              if (newH <= 0) setTimeout(() => triggerGameOver(combatEvent.name + " (Fled)"), 500);
-              return newH;
-          });
-          triggerFlash('red');
-          setLog(prev => [`Ran from ${combatEvent.name} but got scorched.`, ...prev]);
-      }
-      setCombatStats(prev => ({ ...prev, flees: prev.flees + 1 }));
-      setCombatEvent(null);
-  };
-
-
-  // --- SKILL CHECK LOGIC ---
-
-const startCheckRoll = () => {
-    // 1. Calculate the Target (True RNG)
-    const array = new Uint32Array(1);
-    window.crypto.getRandomValues(array);
-    const d20 = (array[0] % 20) + 1;
-
-    setRollTarget(d20);
-    setIsRolling(true);
-};
-
-const handleCheckRollComplete = () => {
-    // Wait for animation to finish
-    setTimeout(() => {
-        finishCheck(rollTarget);
-        setIsRolling(false);
-        setRollTarget(null);
-    }, 800);
-};
-
-    const finishCheck = (d20) => {
-        if (!checkEvent) return;
-
-        const config = checkEvent.config;
+  const finishEvent = (d20) => {
+        if (!activeEvent) return;
+        const config = activeEvent.config;
         
         let bonus = 0;
-        if (config.stat === 'combat') bonus = combatBonus + (player.race.stats.combat || 0);
-        // ... (other stats if added)
+        // Combat Bonus
+        if (config.stat === 'combat') {
+            bonus = combatBonus + (player.race.stats.combat || 0);
+            
+            // Racial Bonuses (Hardcoded for now, could be in DB later)
+            if (player.race.id === 'kobold' && activeEvent.slug === 'dragon') bonus += 5;
+            if (player.race.id === 'halfling' && activeEvent.slug === 'guards') bonus += 5;
+        }
         
         const total = d20 + bonus;
 
@@ -691,30 +504,44 @@ const handleCheckRollComplete = () => {
         else if (total >= config.difficulty) outcomeKey = 'success';
 
         const outcomeData = config.outcomes[outcomeKey];
-
-        // CAPTURE THE TEXT RESULT
         const effectText = applyOutcomeEffect(outcomeData.effect); 
+
+        // Tracking Stats
+        if (activeEvent.type === 'combat') {
+            if (outcomeKey.includes('success')) {
+                setCombatStats(prev => ({ ...prev, wins: prev.wins + 1 }));
+                if (activeEvent.slug === 'dragon') setDragonsKilled(d => d + 1);
+            } else {
+                setCombatStats(prev => ({ ...prev, losses: prev.losses + 1 }));
+            }
+        }
 
         const logText = `[${config.stat.toUpperCase()}] Rolled ${d20} + ${bonus} vs DC ${config.difficulty}. ${outcomeKey.toUpperCase()}!`;
         setLog(prev => [logText, ...prev]);
         triggerFlash(outcomeKey.includes('success') ? 'gold' : 'red');
 
-        // PASS TEXT TO MODAL
-        setCheckEvent(prev => ({
+        setActiveEvent(prev => ({
             ...prev,
             result: {
                 outcome: outcomeKey,
                 text: outcomeData.text,
-                effectText: effectText, // <--- New Field
+                effectText: effectText,
                 roll: d20,
                 total: total
             }
         }));
-    };
+  };
 
-const closeCheckModal = () => {
-    setCheckEvent(null);
-};
+  const closeEventModal = () => setActiveEvent(null);
+
+  const resolveRunAway = () => {
+      if (!activeEvent) return;
+      // Simple penalty for now
+      setHealth(h => h - 10);
+      setCombatStats(prev => ({ ...prev, flees: prev.flees + 1 }));
+      setLog(prev => [`Ran away from ${activeEvent.slug}. Took 10 dmg.`, ...prev]);
+      setActiveEvent(null);
+  };
 
   // --- ACTIONS ---
   const doOddJob = () => {
@@ -856,7 +683,6 @@ const closeCheckModal = () => {
         />
       )}
 
-      {/* UPDATED: Pass buildSelection to StartScreen to preserve menu choice */}
       {gameState === 'start' && <StartScreen player={buildSelection} setPlayer={setBuildSelection} session={session} leaderboard={leaderboard} onLogin={handleGoogleLogin} onLogout={handleLogout} onStart={startGame} onShowProfile={fetchProfile} onShowHelp={() => setGameState('help')} userProfile={userProfile} />}
       
       {gameState === 'profile' && <ProfileScreen profileData={profileData} onClose={() => setGameState('start')} userProfile={userProfile}  onEditTag={() => setShowTagModal(true)}/>}
@@ -868,7 +694,9 @@ const closeCheckModal = () => {
       {gameState === 'playing' && <GameScreen 
           gamertag={userProfile?.gamertag || 'Wanderer'} 
           player={player} day={day} maxDays={MAX_DAYS} location={currentLocation} resources={resources} health={health} maxHealth={maxHealth} debt={debt} 
-          currentPrices={currentPrices} log={log} eventMsg={eventMsg} flash={flash} combatEvent={combatEvent} checkEvent={checkEvent} isRolling={isRolling} rollTarget={rollTarget}
+          currentPrices={currentPrices} log={log} eventMsg={eventMsg} flash={flash} 
+          activeEvent={activeEvent} // UNIFIED EVENT
+          isRolling={isRolling} rollTarget={rollTarget}
           playerItems={playerItems} onPayDebt={payDebt} onTravel={handleEndTurn} onRestart={() => { if(window.confirm("Restart?")) { logGameSession('Quit (Restart)'); startGame(); }}} 
           onQuit={() => { if(window.confirm("Quit?")) { logGameSession('Quit (Menu)'); setGameState('start'); }}} 
           getBuyPrice={getBuyPrice}
@@ -878,12 +706,11 @@ const closeCheckModal = () => {
           onSell={sellItem}
           onSellAll={sellAll}
           onBuyUpgrade={buyUpgrade} 
-          combatActions={{ onRollComplete: handleRollComplete, onRun: resolveRunAway, onFight: startCombatRoll, bonus: combatBonus + (player.race.stats.combat || 0) }}
+          combatActions={{ onRollComplete: handleRollComplete, onRun: resolveRunAway, bonus: combatBonus + (player.race.stats.combat || 0) }}
           onWork={doOddJob} hasTraded={hasTraded}
-          onCheckRoll={startCheckRoll}
-          onCheckComplete={handleCheckRollComplete}
-          onCloseCheck={closeCheckModal}
-          onCloseCombat={closeCombatModal}
+          // UNIFIED HANDLERS
+          onRoll={startRoll}
+          onClose={closeEventModal}
       />}
     </>
   );
