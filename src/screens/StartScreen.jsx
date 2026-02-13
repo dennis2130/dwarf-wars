@@ -55,14 +55,14 @@ export default function StartScreen({
             
             {/* HEADER */}
             <div className="flex justify-between items-center mb-2">
-                <h1 className="text-3xl font-bold text-yellow-500 tracking-tighter flex items-center gap-2"><Shield size={24}/> DWARF WARS</h1>
+                <h1 className="text-3xl font-bold text-yellow-600 tracking-tighter flex items-center gap-2"><Shield size={24}/> DWARF WARS</h1>
                 {!session ? (
                     <button onClick={onLogin} className="text-xs bg-white text-black px-3 py-2 rounded font-bold hover:bg-gray-200">G Login</button>
                 ) : (
                     <div className="flex items-center gap-3">
                         <div className="text-right hidden sm:block">
                             <div className="text-[10px] text-slate-400 uppercase">Player</div>
-                            <div className="text-xs font-bold text-yellow-500">{userProfile?.gamertag}</div>
+                            <div className="text-xs font-bold text-yellow-600">{userProfile?.gamertag}</div>
                         </div>
                         <div className="relative">
                             <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 text-slate-400 hover:text-white"><Menu size={24} /></button>
@@ -96,10 +96,10 @@ export default function StartScreen({
                 {/* LEADERBOARD (Auto Scroll) */}
                 <div className="absolute top-8 left-0 right-0 bg-slate-900/90 z-10 px-2">
                     <div className="flex text-xs border-b border-slate-800 mb-2">
-                        <button onClick={() => setLeaderboardTab('day')} className={`flex-1 py-1 ${leaderboardTab === 'day' ? 'text-yellow-500 font-bold' : 'text-slate-500'}`}>Today</button>
-                        <button onClick={() => setLeaderboardTab('week')} className={`flex-1 py-1 ${leaderboardTab === 'week' ? 'text-yellow-500 font-bold' : 'text-slate-500'}`}>Week</button>
-                        <button onClick={() => setLeaderboardTab('month')} className={`flex-1 py-1 ${leaderboardTab === 'month' ? 'text-yellow-500 font-bold' : 'text-slate-500'}`}>Month</button>
-                        <button onClick={() => setLeaderboardTab('all')} className={`flex-1 py-1 ${leaderboardTab === 'all' ? 'text-yellow-500 font-bold' : 'text-slate-500'}`}>All Time</button>
+                        <button onClick={() => setLeaderboardTab('day')} className={`flex-1 py-1 ${leaderboardTab === 'day' ? 'text-yellow-600 font-bold' : 'text-slate-500'}`}>Today</button>
+                        <button onClick={() => setLeaderboardTab('week')} className={`flex-1 py-1 ${leaderboardTab === 'week' ? 'text-yellow-600 font-bold' : 'text-slate-500'}`}>Week</button>
+                        <button onClick={() => setLeaderboardTab('month')} className={`flex-1 py-1 ${leaderboardTab === 'month' ? 'text-yellow-600 font-bold' : 'text-slate-500'}`}>Month</button>
+                        <button onClick={() => setLeaderboardTab('all')} className={`flex-1 py-1 ${leaderboardTab === 'all' ? 'text-yellow-600 font-bold' : 'text-slate-500'}`}>All Time</button>
                     </div>
                 </div>
                 <div className="absolute top-16 left-0 right-0 bottom-0 p-2 overflow-hidden">

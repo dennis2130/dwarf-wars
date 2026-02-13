@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Map, RotateCcw, LogOut, Shield, ShoppingBag, Sword, FlaskConical } from 'lucide-react';
+import { Map, RotateCcw, LogOut, Shield, ShoppingBag, Sword, FlaskConical, Landmark, Star } from 'lucide-react';
 import StatsBar from '../components/StatsBar';
 import InventoryGrid from '../components/InventoryGrid';
 import MarketItem from '../components/MarketItem';
@@ -140,12 +140,24 @@ export default function GameScreen({
             <button 
                 onClick={onTravel} 
                 className={`w-full text-white font-bold py-4 rounded-lg shadow-lg mb-4 flex items-center justify-center gap-2 ${
-                    hasTraded ? 'bg-blue-600 hover:bg-blue-500' : 'bg-slate-700 hover:bg-slate-600'
+                    day === maxDays 
+                    ? 'bg-yellow-600 hover:bg-yellow-500 text-black shadow-yellow-900/20' // Final Day Style
+                    : hasTraded 
+                        ? 'bg-blue-600 hover:bg-blue-500' 
+                        : 'bg-slate-700 hover:bg-slate-600'
                 }`}
             >
-                {hasTraded ? (
+                {day === maxDays ? (
+                    // FINAL DAY STATE
+                    <>
+                        <Star  size={20} /> 
+                        <span className="uppercase tracking-wider">Time to End Your Adventure</span>
+                    </>
+                ) : hasTraded ? (
+                    // STANDARD TRAVEL
                     <><Map size={20}/> Travel to New Location</>
                 ) : (
+                    // STANDARD WORK
                     <><Map size={20}/> Work & Travel (50-200g)</>
                 )}
             </button>
