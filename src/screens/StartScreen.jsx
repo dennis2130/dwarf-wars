@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react'; 
 import { RACES, CLASSES } from '../gameData'; 
 import { Shield, Menu, User, LogOut, BookOpen } from 'lucide-react';
 
@@ -9,8 +9,60 @@ export default function StartScreen({
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [leaderboardTab, setLeaderboardTab] = useState('day'); 
+    
+     // --- SCROLL LOGIC ---
+    const scrollRef = useRef(null);
+    const [isPaused, setIsPaused] = useState(false);
+    const [hasStarted, setHasStarted] = useState(false); // Track if initial delay is done
 
-    // Toggle Logic
+    useEffect(() => {
+        const container = scrollRef.current;
+        if (!container) return;
+
+        let animationFrameId;
+        let startTimeoutId;
+        
+        // Counter to control speed (defined OUTSIDE the loop)
+        let tick = 0; 
+
+        const scroll = () => {
+            if (isPaused) return; // Don't fight the user
+
+            tick++;
+            
+            // SPEED CONTROL:
+            // % 2 = Half Speed (30fps)
+            // % 3 = Third Speed (20fps) - Good for reading
+            if (tick % 3 === 0) {
+                container.scrollTop += 1;
+            }
+
+            // Infinite Loop Logic
+            if (container.scrollTop >= (container.scrollHeight / 2)) {
+                container.scrollTop = 0;
+            }
+            
+            animationFrameId = requestAnimationFrame(scroll);
+        };
+
+        if (!hasStarted) {
+            // Initial Load: Wait 2.5s for splash screen
+            startTimeoutId = setTimeout(() => {
+                setHasStarted(true);
+                animationFrameId = requestAnimationFrame(scroll);
+            }, 2500);
+        } else if (!isPaused) {
+            // Resume immediately if not paused and already started
+            animationFrameId = requestAnimationFrame(scroll);
+        }
+
+        return () => {
+            clearTimeout(startTimeoutId);
+            cancelAnimationFrame(animationFrameId);
+        };
+    }, [isPaused, hasStarted, leaderboardTab, leaderboard]);
+
+    // --- GAME LOGIC ---
     const toggleRace = (r) => {
         setPlayer(prev => ({ ...prev, race: prev.race?.id === r.id ? null : r }));
     };
@@ -19,7 +71,6 @@ export default function StartScreen({
         setPlayer(prev => ({ ...prev, class: prev.class?.id === c.id ? null : c }));
     };
 
-    // Button Text Logic
     const getPlayButtonText = () => {
         if (!player.race && !player.class) return "PLAY RANDOM BUILD";
         if (!player.race) return "PLAY RANDOM RACE";
@@ -55,14 +106,14 @@ export default function StartScreen({
             
             {/* HEADER */}
             <div className="flex justify-between items-center mb-2">
-                <h1 className="text-3xl font-bold text-yellow-600 tracking-tighter flex items-center gap-2"><Shield size={24}/> DWARF WARS</h1>
+                <h1 className="text-3xl font-bold text-yellow-500 tracking-tighter flex items-center gap-2"><Shield size={24}/> DWARF WARS</h1>
                 {!session ? (
                     <button onClick={onLogin} className="text-xs bg-white text-black px-3 py-2 rounded font-bold hover:bg-gray-200">G Login</button>
                 ) : (
                     <div className="flex items-center gap-3">
                         <div className="text-right hidden sm:block">
                             <div className="text-[10px] text-slate-400 uppercase">Player</div>
-                            <div className="text-xs font-bold text-yellow-600">{userProfile?.gamertag}</div>
+                            <div className="text-xs font-bold text-yellow-500">{userProfile?.gamertag}</div>
                         </div>
                         <div className="relative">
                             <button onClick={() => setMenuOpen(!menuOpen)} className="p-2 text-slate-400 hover:text-white"><Menu size={24} /></button>
@@ -77,7 +128,7 @@ export default function StartScreen({
                 )}
             </div>
 
-            {/* DRAGON ART - Added Here */}
+            {/* DRAGON ART */}
             <div className="flex justify-center mb-4 relative z-0">
                 <img 
                     src="/dragon.png" 
@@ -89,30 +140,41 @@ export default function StartScreen({
             {/* LEADERBOARD CONTAINER */}
             <div className="mb-8 bg-black/30 rounded-lg border border-slate-800 h-40 relative overflow-hidden shadow-inner">
                 
-                {/* 1. TITLE (Fixed to top of box) */}
+                {/* 1. TITLE */}
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest absolute top-0 left-0 right-0 bg-slate-900/90 p-2 z-10 border-b border-slate-800 text-center">
                     Global Leaders
                 </h3>
-                {/* LEADERBOARD (Auto Scroll) */}
+                
+                {/* 2. TABS */}
                 <div className="absolute top-8 left-0 right-0 bg-slate-900/90 z-10 px-2">
                     <div className="flex text-xs border-b border-slate-800 mb-2">
-                        <button onClick={() => setLeaderboardTab('day')} className={`flex-1 py-1 ${leaderboardTab === 'day' ? 'text-yellow-600 font-bold' : 'text-slate-500'}`}>Today</button>
-                        <button onClick={() => setLeaderboardTab('week')} className={`flex-1 py-1 ${leaderboardTab === 'week' ? 'text-yellow-600 font-bold' : 'text-slate-500'}`}>Week</button>
-                        <button onClick={() => setLeaderboardTab('month')} className={`flex-1 py-1 ${leaderboardTab === 'month' ? 'text-yellow-600 font-bold' : 'text-slate-500'}`}>Month</button>
-                        <button onClick={() => setLeaderboardTab('all')} className={`flex-1 py-1 ${leaderboardTab === 'all' ? 'text-yellow-600 font-bold' : 'text-slate-500'}`}>All Time</button>
+                        <button onClick={() => setLeaderboardTab('day')} className={`flex-1 py-1 ${leaderboardTab === 'day' ? 'text-yellow-500 font-bold' : 'text-slate-500'}`}>Today</button>
+                        <button onClick={() => setLeaderboardTab('week')} className={`flex-1 py-1 ${leaderboardTab === 'week' ? 'text-yellow-500 font-bold' : 'text-slate-500'}`}>Week</button>
+                        <button onClick={() => setLeaderboardTab('month')} className={`flex-1 py-1 ${leaderboardTab === 'month' ? 'text-yellow-500 font-bold' : 'text-slate-500'}`}>Month</button>
+                        <button onClick={() => setLeaderboardTab('all')} className={`flex-1 py-1 ${leaderboardTab === 'all' ? 'text-yellow-500 font-bold' : 'text-slate-500'}`}>All Time</button>
                     </div>
                 </div>
-                <div className="absolute top-16 left-0 right-0 bottom-0 p-2 overflow-hidden">
-                    <div className="scrolling-list" style={{ animationDuration: `${Math.max(20, listToRender.length * .75)}s` }}>
-                            {listToRender.map((score, i) => (
-                                
+
+                {/* 3. SCROLLING LIST (HIDDEN SCROLLBAR) */}
+                <div 
+                    ref={scrollRef}
+                    className="absolute top-16 left-0 right-0 bottom-0 p-2 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']"
+                    onMouseEnter={() => setIsPaused(true)}
+                    onMouseLeave={() => setIsPaused(false)}
+                    onTouchStart={() => setIsPaused(true)}
+                    onTouchEnd={() => setIsPaused(false)}
+                >
+                    <div>
+                        {listToRender.map((score, i) => (
                             <div key={i} className="flex justify-between text-sm items-center mb-1 border-b border-slate-800/50 pb-1">
                                 <span className="text-slate-400 flex gap-2">
                                     <span className="text-slate-600 font-mono w-4">#{i % 20 + 1}</span> 
-                                    {score.gamertag || score.player_name}</span>
-                                    <span className="text-slate-600 text-[10px]">({score.race} {score.class})</span>
-                                    <span className={`font-mono ${score.final_score > 0 ? "text-green-500" : "text-red-500"}`}>{score.final_score.toLocaleString()}</span>
-                                
+                                    {score.gamertag || score.player_name}
+                                </span>
+                                <span className="text-slate-600 text-[10px]">({score.race} {score.class})</span>
+                                <span className={`font-mono ${score.final_score > 0 ? "text-green-500" : "text-red-500"}`}>
+                                    {score.final_score.toLocaleString()}
+                                </span>
                             </div>
                         ))}
                     </div>
