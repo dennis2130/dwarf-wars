@@ -131,17 +131,26 @@ The travel mechanic triggers random events that affect gameplay:
 
 2. **Trade & Survive:**
 	- Buy low, sell high! Prices change with each location and event.
-	- Manage your inventory and gold.
-	- Pay off your debt to avoid penalties.
-	- Travel to new locations, but beware of risks and random events.
+	- Manage your inventory and gold carefully.
+	- **Strategic Trading:** Each day, you must choose between:
+	  - **Staying Put (Work):** Make no trades, earn 50-200g from odd jobs, heal slightly, and use events to your advantage. Useful when you're low on health or scouting market conditions.
+	  - **Active Trading:** Buy and sell items, then you're forced to travel to a new location. More risk, more reward potential.
+	- Remember: **Debt interest (5%) compounds daily**, regardless of your action, so paying off your starting debt early maximizes your final score.
+	- Use the "Pay" link next to your debt to pay it off whenever possible.
+	- Travel to new locations to find better prices and opportunities, but be aware of location-specific risks.
 
 3. **Upgrade:**
 	- Buy upgrades to increase inventory or defense.
 	- Upgrades are permanent for your current run.
 
-4. **Game End:**
-	- The game ends after 31 days or if your health drops to zero.
-	- Your final score is Gold minus Debt. High scores are saved if logged in.
+4. **Game End & Winning:**
+	- The game runs for exactly **31 days**. On day 31, you cannot work or travel further—the game immediately ends.
+	- The game also ends instantly if your **health drops to zero** (from combat, bleed damage, or events).
+	- **Victory Condition:** You must pay off your **entire debt** to achieve victory. If you have debt remaining on day 31 (or when you die), you lose regardless of how much gold you've accumulated.
+	- Your **final score = Gold Remaining - Outstanding Debt**. Only positive scores (debt fully paid) count as victories.
+	- **Strategic Note:** Since debt compounds at 5% daily for 31 days, paying it off early is heavily rewarded. For example, starting with 5000 debt, you must pay more each day as interest accumulates.
+	- Different end-game scenarios unlock based on your final state (victory with no debt, death with paid debt, bankruptcy, etc.), each with unique flavor narratives.
+	- All game sessions are logged to the database for analytics, and victories are saved to the global leaderboard if you're logged in.
 
 
 ## Controls
@@ -153,20 +162,30 @@ The travel mechanic triggers random events that affect gameplay:
   - **ALL Button:** Sell all items of a type instantly.
   - **Profit Color Coding:** Sell prices turn green if selling above your average cost, red if below.
 - **Armory & Stables Tab:** Purchase permanent upgrades (inventory, weapons, defense, consumables).
-- **Travel Button:** Move to a new location and trigger random events.
+- **Work & Travel Mechanics:** The primary action button adapts based on your trading activity:
+  - **Work Mode (No Trades Today):** If you haven't bought or sold items during the current day, clicking "Work & Travel" keeps you in the current location. You earn 50-200 gold from odd jobs and may encounter random events. This is useful for healing up or making quick gold.
+  - **Travel Mode (After Trading):** Once you've made any buy or sell transaction, the button changes to "Travel to New Location." You'll move to a random new city, earn no wages, and encounter random events. Debt interest (5%) is applied immediately on each action (whether Work or Travel), and the day counter increments.
+  - **Final Day:** On day 31, the button becomes "Time to End Your Adventure" in golden yellow, triggering the game-over sequence immediately.
 - **Combat & Skill Checks:** When triggered, a unified modal appears for both combat encounters and skill checks.
   - Roll a D20 die using cryptographic randomization with your character's bonus applied.
   - For combat: Combat stats + racial bonuses (Kobolds +5 vs Dragons, Halflings +5 vs Guards).
   - Success/Failure determined by comparing roll total against difficulty check (DC).
   - Critical Successes (Nat 20) and Critical Failures (Nat 1) with dramatic outcomes and special effects.
   - For combat only: "Run Away" button to flee with a 10 HP penalty. The ScrambleDie animates the outcome.
+- **Bleed Mechanic:** When your health drops below 25% of maximum, you take 5 damage each time you Work or Travel. This stacking penalty can quickly lead to death, so healing becomes critical at low health.
 - **Pay Debt:** Click on the "Pay" link next to your debt to pay it off.
 - **Leaderboard Filters:** On the start screen, view the global leaderboard filtered by time period:
   - **Today:** Top scores from the past 24 hours
   - **Week:** Top scores from the past 7 days
   - **Month:** Top scores from the past 30 days
   - **All Time:** Top scores since the game launched
-- **My Profile:** (If logged in) View your lifetime statistics, personal achievements, and recent game history.
+- **My Profile:** (If logged in) View your lifetime statistics including:
+  - **Total Runs:** Number of games you've started
+  - **Lifetime Profit:** Total gold earned across all games minus total debt paid
+  - **Personal Best:** Your highest single-game score
+  - **Deaths:** Total number of times you've lost a game
+  - **Dragon Heads:** Total dragons defeated across all runs
+  - **Recent Game History:** Last 10-15 games with scores, race/class, and outcomes
 - **Exit/Restart:** Use the in-game option to exit your current run and start over.
 - **Help/Guide:** Click the Help button to view the in-game guide explaining races, classes, controls, and advanced mechanics like Bleed and Guard encounters.
 

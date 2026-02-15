@@ -156,7 +156,6 @@ function App() {
     const currentTag = userProfile?.gamertag || 'Guest';
 
     const sessionData = {
-        user_email: session?.user?.email || 'Anonymous',
         char_name: currentTag,
         gamertag: currentTag,
         race: player.race?.name,
