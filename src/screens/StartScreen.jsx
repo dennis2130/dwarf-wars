@@ -131,7 +131,7 @@ export default function StartScreen({
             {/* DRAGON ART */}
             <div className="flex justify-center mb-4 relative z-0">
                 <img 
-                    src="/dragon.png" 
+                    src="./dragon.png" 
                     alt="Dragon Hoard" 
                     className="h-28 w-auto object-contain opacity-90 drop-shadow-lg" 
                 />

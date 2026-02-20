@@ -60,12 +60,41 @@ function App() {
     fetchEvents();
 
     const initSession = async () => {
+        // Check if we are running on Channel 3 (In-Game Browser with C3 API)
+        const isChannel3 = window.location.hostname.includes('channel3.gg');
+
+        if (isChannel3) {
+            try {
+                console.log("Channel 3 Environment Detected. Fetching User Data...");
+                
+                // Fetch User Data from C3 API (Same Origin)
+                const response = await fetch('/api/me');
+                
+                if (response.ok) {
+                    const c3Data = await response.json();
+                    
+                    if (c3Data.status === 'success' && c3Data.data) {
+                        const c3User = c3Data.data;
+                        console.log("C3 User Found:", c3User.gamertag);
+
+                        // LOGIC: Link or Create Profile in Supabase
+                        await handleChannel3Login(c3User);
+                        return; 
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to connect to Channel 3 API:", err);
+            }
+        }
+
+        // Fallback: Standard Supabase Auth (Vercel / Localhost)
         const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
         if (session) {
             checkProfile(session.user.id);
         }
     };
+
     initSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -84,6 +113,87 @@ function App() {
     const timer = setTimeout(() => setSplash(false), 2500);
     return () => { subscription.unsubscribe(); clearTimeout(timer); };
   }, []);
+
+    // --- NEW HELPER: HANDLE CHANNEL 3 LOGIN ---
+  const handleChannel3Login = async (c3User) => {
+      // 1. Try to find profile by Channel 3 ID (Best Match)
+      let { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('channel3_id', c3User.userid)
+          .single();
+
+      // 2. If not found by ID, try to find by Gamertag (Legacy Match)
+      if (!profile) {
+          const { data: tagProfile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('gamertag', c3User.gamertag)
+              .single();
+          
+          if (tagProfile) {
+              console.log("Found legacy profile by Gamertag. Linking Channel 3 ID...");
+              // Update the existing profile with the C3 ID so next time we find it by ID
+              await supabase
+                  .from('profiles')
+                  .update({ channel3_id: c3User.userid })
+                  .eq('id', tagProfile.id);
+              
+              profile = tagProfile;
+          }
+      }
+
+      // 3. If still no profile, we need to create one.
+      // CRITICAL: We need a UUID for the 'id' column in profiles.
+      // Since we can't force Google Auth, we will sign in Anonymously to get a UUID.
+      if (!profile) {
+          console.log("No profile found. Creating new linked profile...");
+          
+          // Sign in anon to generate a valid Supabase UUID
+          const { data: authData } = await supabase.auth.signInAnonymously();
+          
+          if (authData.session) {
+              const newUserId = authData.session.user.id;
+              
+              // Create the profile linked to C3
+              const { error: insertError } = await supabase
+                  .from('profiles')
+                  .insert([{
+                      id: newUserId,
+                      gamertag: c3User.gamertag,
+                      channel3_id: c3User.userid,
+                      // You can also pull their avatar if you want: c3User.profileimg
+                  }]);
+              
+              if (!insertError) {
+                  // Fetch it back to confirm
+                  const { data: newProfile } = await supabase.from('profiles').select('*').eq('id', newUserId).single();
+                  profile = newProfile;
+                  setSession(authData.session); // Set the actual Supabase Session
+              }
+          }
+      } else {
+          // 4. We found a profile. 
+          // However, we might not have a Supabase "Session" for it (e.g. they logged in via Google previously).
+          // For the game to work, we need to set the UserProfile state.
+          // Note: RLS might block writes if we aren't actually logged in as this user via Supabase Auth.
+          // For now, we trust the C3 context for "Play", but writing logs might fail if RLS requires auth.uid() == id.
+          // To fix this fully, C3 needs a custom Supabase Auth integration, but for this step:
+          
+          // If we are NOT logged in, perform an Anon login just to have *some* write capability, 
+          // even if it doesn't match the Profile ID (requires disabling strict RLS for logs).
+          if (!session) {
+             const { data: anonAuth } = await supabase.auth.signInAnonymously();
+             setSession(anonAuth.session);
+          }
+      }
+
+      // 5. Final State Update
+      if (profile) {
+          setUserProfile(profile);
+          console.log("Logged in as:", profile.gamertag);
+      }
+  };
 
   const fetchEvents = async () => {
     const { data, error } = await supabase.from('game_events').select('*').eq('is_active', true);
@@ -666,7 +776,7 @@ function App() {
   return (
     <>
       <div onClick={() => setSplash(false)} className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900 transition-opacity duration-1000 ${splash ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-        <img src="/logo.png" alt="Dwarf Wars" className="w-64 h-auto mb-8 animate-in fade-in zoom-in duration-1000" />
+        <img src="./logo.png" alt="Dwarf Wars" className="w-64 h-auto mb-8 animate-in fade-in zoom-in duration-1000" />
         <div className="text-yellow-500 text-xs tracking-[0.5em] font-bold animate-pulse">LOADING REALM...</div>
       </div>
 

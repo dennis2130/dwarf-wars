@@ -7,7 +7,7 @@ body {
   @apply bg-slate-900;
 
   /* 2. The Image */
-  background-image: url('/map-bg.jpg');
+  background-image: url('./map-bg.jpg');
 
   /* 3. Positioning: Keep it centered so the "Castle" is likely visible */
   background-position: center center;
