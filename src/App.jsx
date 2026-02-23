@@ -67,7 +67,7 @@ function App() {
 
         if (isChannel3) {
             try {
-                console.log("Channel 3 Environment Detected. Fetching User Data...");
+                //console.log("Channel 3 Environment Detected. Fetching User Data...");
                 
                 // Fetch User Data from C3 API (Same Origin)
                 const response = await fetch('/api/me');
@@ -77,7 +77,7 @@ function App() {
                     
                     if (c3Data.status === 'success' && c3Data.data) {
                         const c3User = c3Data.data;
-                        console.log("C3 User Found:", c3User.gamertag);
+                        //console.log("C3 User Found:", c3User.gamertag);
 
                         // LOGIC: Link or Create Profile in Supabase
                         await handleChannel3Login(c3User);
@@ -134,7 +134,7 @@ function App() {
               .maybeSingle(); // <--- CHANGED FROM .single()
           
           if (tagProfile) {
-              console.log("Found legacy profile by Gamertag. Linking Channel 3 ID...");
+              //console.log("Found legacy profile by Gamertag. Linking Channel 3 ID...");
               // Update existing profile with C3 ID and profile image
               await supabase
                   .from('profiles')
@@ -154,7 +154,7 @@ function App() {
 
 // 3. Create new profile if needed
       if (!profile) {
-          console.log("No profile found. Creating new linked profile...");
+          //console.log("No profile found. Creating new linked profile...");
           
           const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
           
@@ -190,7 +190,7 @@ function App() {
           // 4. Existing profile found. Ensure we have a session to write logs.
           // Also make sure the profile object has the c3_profile_image
           if (!profile.c3_profile_image && c3User.profileimg50) {
-              console.log("Existing profile needs Channel 3 image linked.");
+             // console.log("Existing profile needs Channel 3 image linked.");
                await supabase
                   .from('profiles')
                   .update({ c3_profile_image: c3User.profileimg50 })
@@ -206,7 +206,7 @@ function App() {
       // 5. Final State Update
       if (profile) {
           setUserProfile(profile);
-          console.log("Logged in as:", profile.gamertag, "C3 Image:", profile.c3_profile_image);
+          //console.log("Logged in as:", profile.gamertag, "C3 Image:", profile.c3_profile_image);
       }
   };
 
@@ -308,11 +308,11 @@ function App() {
     // 1. Identify the Target ID
     const targetId = userProfile?.id || session?.user?.id;
     
-    console.log("--- LOGGING SESSION DEBUG ---");
-    console.log("Status:", status);
-    console.log("Gamertag:", currentTag);
-    console.log("Target Profile ID:", targetId);
-    console.log("Session ID:", session?.user?.id);
+    //console.log("--- LOGGING SESSION DEBUG ---");
+    //console.log("Status:", status);
+   //console.log("Gamertag:", currentTag);
+    //console.log("Target Profile ID:", targetId);
+    //console.log("Session ID:", session?.user?.id);
 
     const sessionData = {
         char_name: currentTag,
@@ -336,7 +336,7 @@ function App() {
         // Promise 2: Stats RPC to Supabase
         if (targetId) {
             const isDead = status === 'Dead';
-            console.log("Attempting RPC call 'update_player_stats' for:", targetId);
+            //console.log("Attempting RPC call 'update_player_stats' for:", targetId);
             
             const statsPromise = supabase.rpc('update_player_stats', { 
                 player_id: targetId,
@@ -388,7 +388,7 @@ function App() {
                     // Still good to get the text for error messages if it's not 'ok'
                     return response.text().then(text => { throw new Error(`Channel 3 API error: ${response.status} - ${text}`) });
                 }
-                console.log("Successfully sent game stats to Channel 3.");
+                //console.log("Successfully sent game stats to Channel 3.");
                 // --- KERNEL OF THE FIX ---
                 // If you don't expect or need the response as JSON, don't try to parse it.
                 // Just return the response object itself, or nothing.
@@ -421,7 +421,7 @@ function App() {
             if (supabaseRpcResult.status === 'rejected') {
                 console.error("Supabase RPC Stats Update Error:", supabaseRpcResult.reason);
             } else if (supabaseRpcResult.status === 'fulfilled') {
-                console.log("Supabase RPC Stats Update Success");
+                //console.log("Supabase RPC Stats Update Success");
             }
         }
         // Channel 3 result is handled within its promise chain
