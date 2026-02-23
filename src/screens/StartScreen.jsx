@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'; 
-import { RACES, CLASSES } from '../gameData'; 
-import { Shield, Menu, User, LogOut, BookOpen } from 'lucide-react';
+import { RACES, CLASSES, GAME_META } from '../gameData'; 
+import { Shield, Menu, User, LogOut, BookOpen, ArrowLeft } from 'lucide-react';
 
 export default function StartScreen({ 
     player, setPlayer, 
@@ -9,6 +9,10 @@ export default function StartScreen({
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [leaderboardTab, setLeaderboardTab] = useState('day'); 
+
+        // --- Determine if running on Channel 3 ---
+    const isChannel3 = window.location.hostname.includes('channel3.gg'); 
+    //const isChannel3 = true; 
     
      // --- SCROLL LOGIC ---
     const scrollRef = useRef(null);
@@ -101,16 +105,34 @@ export default function StartScreen({
 
     const listToRender = [...getFilteredLeaderboard(), ...getFilteredLeaderboard()];
 
+        // --- NEW: Handle Return to C3 ---
+    const handleReturnToC3 = () => {
+        if (isChannel3) {
+            window.history.back(); // Go back to the previous page in history (likely a C3 page)
+        } else {
+            // Optional: If for some reason this is triggered outside C3,
+            // you might want a fallback, e.g., navigate to a specific URL
+            console.warn("Attempted to return to C3 outside Channel 3 environment.");
+        }
+    };
+
     return (
         <div className="min-h-screen bg-slate-900 text-slate-200 p-6 max-w-md mx-auto border-x border-slate-700 font-sans">
             
             {/* HEADER */}
-            <div className="flex justify-between items-center mb-2">
+            <div className="flex justify-between items-center mb-1">
                 <h1 className="text-3xl font-bold text-yellow-500 tracking-tighter flex items-center gap-2"><Shield size={24}/> DWARF WARS</h1>
                 {!session ? (
                     <button onClick={onLogin} className="text-xs bg-white text-black px-3 py-2 rounded font-bold hover:bg-gray-200">G Login</button>
                 ) : (
                     <div className="flex items-center gap-3">
+                        {userProfile?.c3_profile_image && ( 
+                            <img 
+                                src={userProfile.c3_profile_image} 
+                                alt="Player Avatar" 
+                                className="w-8 h-8 rounded-full border border-yellow-500 object-cover" 
+                            />
+                        )}
                         <div className="text-right hidden sm:block">
                             <div className="text-[10px] text-slate-400 uppercase">Player</div>
                             <div className="text-xs font-bold text-yellow-500">{userProfile?.gamertag}</div>
@@ -128,8 +150,20 @@ export default function StartScreen({
                 )}
             </div>
 
+            {/* RETURN TO C3 BUTTON */}
+            {isChannel3 && ( 
+                <div className="mb-1 text-left">
+                    <button // Changed from <a> to <button>
+                        onClick={handleReturnToC3} 
+                        className="inline-flex items-center gap-1 text-yellow-500 hover:text-blue-300 transition-colors text-sm font-semibold"
+                    >
+                        <ArrowLeft size={16}/> Return to C3
+                    </button>
+                </div>
+            )}
+
             {/* DRAGON ART */}
-            <div className="flex justify-center mb-4 relative z-0">
+            <div className="flex justify-center mb-1 relative z-0">
                 <img 
                     src="./dragon.png" 
                     alt="Dragon Hoard" 
@@ -224,6 +258,11 @@ export default function StartScreen({
                     Read Rules & Lore
                 </button>
             </div>
+
+            <div className="text-center text-[10px] text-slate-600 font-mono pb-4">
+            <p>{GAME_META.studio}</p>
+            <p className="opacity-50">{GAME_META.version}</p>
+        </div>
         </div>
     );
 }

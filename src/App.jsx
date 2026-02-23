@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { RACES, CLASSES, LOCATIONS, UPGRADES, BASE_PRICES } from './gameData'
+import { RACES, CLASSES, LOCATIONS, UPGRADES, BASE_PRICES, GAME_META } from './gameData'
 import { supabase } from './supabaseClient'
 
 // Import Screens
@@ -51,6 +51,8 @@ function App() {
   const [activeEvent, setActiveEvent] = useState(null); 
   const [isRolling, setIsRolling] = useState(false);
   const [rollTarget, setRollTarget] = useState(null);
+
+  const DEBUG_GAMERTAG = import.meta.env.VITE_DEBUG_GAMERTAG;
 
   const MAX_DAYS = 31;
 
@@ -114,84 +116,97 @@ function App() {
     return () => { subscription.unsubscribe(); clearTimeout(timer); };
   }, []);
 
-    // --- NEW HELPER: HANDLE CHANNEL 3 LOGIN ---
+  // --- NEW HELPER: HANDLE CHANNEL 3 LOGIN ---
   const handleChannel3Login = async (c3User) => {
-      // 1. Try to find profile by Channel 3 ID (Best Match)
-      let { data: profile, error } = await supabase
+      // 1. Try to find profile by Channel 3 ID (Use maybeSingle to avoid 406 error)
+      let { data: profile } = await supabase
           .from('profiles')
           .select('*')
           .eq('channel3_id', c3User.userid)
-          .single();
+          .maybeSingle(); // <--- CHANGED FROM .single()
 
-      // 2. If not found by ID, try to find by Gamertag (Legacy Match)
+      // 2. If not found by ID, try to find by Gamertag
       if (!profile) {
           const { data: tagProfile } = await supabase
               .from('profiles')
               .select('*')
               .eq('gamertag', c3User.gamertag)
-              .single();
+              .maybeSingle(); // <--- CHANGED FROM .single()
           
           if (tagProfile) {
               console.log("Found legacy profile by Gamertag. Linking Channel 3 ID...");
-              // Update the existing profile with the C3 ID so next time we find it by ID
+              // Update existing profile with C3 ID and profile image
               await supabase
                   .from('profiles')
-                  .update({ channel3_id: c3User.userid })
+                  .update({ 
+                      channel3_id: c3User.userid,
+                      c3_profile_image: c3User.profileimg50 || null // Store the image URL
+                  })
                   .eq('id', tagProfile.id);
               
-              profile = tagProfile;
+              profile = { 
+                ...tagProfile, 
+                channel3_id: c3User.userid,
+                c3_profile_image: c3User.profileimg50 || null // Ensure current profile object has it
+              };
           }
       }
 
-      // 3. If still no profile, we need to create one.
-      // CRITICAL: We need a UUID for the 'id' column in profiles.
-      // Since we can't force Google Auth, we will sign in Anonymously to get a UUID.
+// 3. Create new profile if needed
       if (!profile) {
           console.log("No profile found. Creating new linked profile...");
           
-          // Sign in anon to generate a valid Supabase UUID
-          const { data: authData } = await supabase.auth.signInAnonymously();
+          const { data: authData, error: authError } = await supabase.auth.signInAnonymously();
           
+          if (authError) {
+              console.error("Anon Login Failed:", authError);
+              return; 
+          }
+
           if (authData.session) {
               const newUserId = authData.session.user.id;
               
-              // Create the profile linked to C3
+              const newProfileData = {
+                  id: newUserId,
+                  gamertag: c3User.gamertag,
+                  channel3_id: c3User.userid,
+                  c3_profile_image: c3User.profileimg50 || null // Store the image URL
+              };
+
               const { error: insertError } = await supabase
                   .from('profiles')
-                  .insert([{
-                      id: newUserId,
-                      gamertag: c3User.gamertag,
-                      channel3_id: c3User.userid,
-                      // You can also pull their avatar if you want: c3User.profileimg
-                  }]);
+                  .insert([newProfileData]);
               
               if (!insertError) {
-                  // Fetch it back to confirm
-                  const { data: newProfile } = await supabase.from('profiles').select('*').eq('id', newUserId).single();
-                  profile = newProfile;
-                  setSession(authData.session); // Set the actual Supabase Session
+                  // OPTIMIZATION: Don't fetch again. Just use the data we have.
+                  // This prevents the 406 error if RLS latency causes a read miss.
+                  profile = newProfileData; 
+                  setSession(authData.session);
+              } else {
+                  console.error("Profile creation failed:", insertError);
               }
           }
       } else {
-          // 4. We found a profile. 
-          // However, we might not have a Supabase "Session" for it (e.g. they logged in via Google previously).
-          // For the game to work, we need to set the UserProfile state.
-          // Note: RLS might block writes if we aren't actually logged in as this user via Supabase Auth.
-          // For now, we trust the C3 context for "Play", but writing logs might fail if RLS requires auth.uid() == id.
-          // To fix this fully, C3 needs a custom Supabase Auth integration, but for this step:
-          
-          // If we are NOT logged in, perform an Anon login just to have *some* write capability, 
-          // even if it doesn't match the Profile ID (requires disabling strict RLS for logs).
+          // 4. Existing profile found. Ensure we have a session to write logs.
+          // Also make sure the profile object has the c3_profile_image
+          if (!profile.c3_profile_image && c3User.profileimg50) {
+              console.log("Existing profile needs Channel 3 image linked.");
+               await supabase
+                  .from('profiles')
+                  .update({ c3_profile_image: c3User.profileimg50 })
+                  .eq('id', profile.id);
+              profile.c3_profile_image = c3User.profileimg50; // Update local state for consistency
+          }
+
           if (!session) {
-             const { data: anonAuth } = await supabase.auth.signInAnonymously();
-             setSession(anonAuth.session);
+             await supabase.auth.signInAnonymously();
           }
       }
 
       // 5. Final State Update
       if (profile) {
           setUserProfile(profile);
-          console.log("Logged in as:", profile.gamertag);
+          console.log("Logged in as:", profile.gamertag, "C3 Image:", profile.c3_profile_image);
       }
   };
 
@@ -202,12 +217,22 @@ function App() {
   };
 
   const checkProfile = async (userId) => {
-      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      // CHANGED: .maybeSingle() returns null instead of an error if not found
+      const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+      
       if (data && data.gamertag) {
-          setUserProfile(data);
+          // If we had a c3_profile_image from a C3 login, retain it
+          if (userProfile?.c3_profile_image) {
+              setUserProfile({ ...data, c3_profile_image: userProfile.c3_profile_image });
+          } else {
+              setUserProfile(data);
+          }
           setShowTagModal(false);
       } else {
-          setShowTagModal(true);
+          // Only show modal if we aren't on Channel 3 (C3 handles its own profiles)
+          if (!window.location.hostname.includes('channel3.gg')) {
+              setShowTagModal(true);
+          }
       }
   };
 
@@ -225,9 +250,24 @@ function App() {
   };
   
   const fetchProfile = async () => {
-    if (!session) return;
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
-    const { data: history } = await supabase.from('game_logs').select('*').eq('user_email', session.user.email).order('created_at', { ascending: false }).limit(10);
+    // 1. If we already loaded a C3 profile, just use that ID
+    const targetId = userProfile?.id || session?.user?.id;
+    if (!targetId) return;
+
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', targetId) // Use the ID we know is correct
+        .maybeSingle();
+
+    const { data: history } = await supabase
+        .from('game_logs')
+        // We removed email, so we fetch by gamertag now
+        .select('*')
+        .eq('gamertag', profile?.gamertag) 
+        .order('created_at', { ascending: false })
+        .limit(10);
+
 
     if (profile && history) {
         setProfileData({ 
@@ -265,6 +305,15 @@ function App() {
     const finalScore = Math.max(0, rawScore);
     const currentTag = userProfile?.gamertag || 'Guest';
 
+    // 1. Identify the Target ID
+    const targetId = userProfile?.id || session?.user?.id;
+    
+    console.log("--- LOGGING SESSION DEBUG ---");
+    console.log("Status:", status);
+    console.log("Gamertag:", currentTag);
+    console.log("Target Profile ID:", targetId);
+    console.log("Session ID:", session?.user?.id);
+
     const sessionData = {
         char_name: currentTag,
         gamertag: currentTag,
@@ -279,23 +328,107 @@ function App() {
 
     try {
         const promises = [];
+        
+        // Promise 1: Log Insert to Supabase
         const logPromise = supabase.from('game_logs').insert([sessionData]);
         promises.push(logPromise);
 
-        if (session?.user?.id) {
+        // Promise 2: Stats RPC to Supabase
+        if (targetId) {
             const isDead = status === 'Dead';
+            console.log("Attempting RPC call 'update_player_stats' for:", targetId);
+            
             const statsPromise = supabase.rpc('update_player_stats', { 
-                player_id: session.user.id,
+                player_id: targetId,
                 gold_earned: finalScore,
                 is_dead: isDead,
                 dragons: dragonsKilled, 
                 score: finalScore
             });
             promises.push(statsPromise);
+        } else {
+            console.warn("!! NO TARGET ID FOUND. Supabase Stats will not be updated. !!");
         }
-        await Promise.all(promises);
+
+        // --- NEW: Channel 3 API Call ---
+        const isChannel3 = window.location.hostname.includes('channel3.gg');
+        const c3UserId = userProfile?.channel3_id; // This was stored during handleChannel3Login
+
+        if (isChannel3 && c3UserId) {
+            // IMPORTANT: Replace these with the actual values provided by Joel!
+            // You might want to move these to a gameData.js or environment variables
+            const CHANNEL3_BOSS_ID = import.meta.env.VITE_C3_BOSS_ID;
+            const CHANNEL3_CHEAT_CODE = import.meta.env.VITE_C3_CHEAT_CODE;
+            const CHANNEL3_GAME_ID = import.meta.env.VITE_C3_GAME_ID; 
+
+            const channel3Payload = {
+                bossid: CHANNEL3_BOSS_ID,
+                cheatcode: CHANNEL3_CHEAT_CODE,
+                gameid: CHANNEL3_GAME_ID,
+                datetime: new Date().toISOString(), // Current ISO timestamp
+                sessionid: session?.id || 'UNAUTH_C3_SESSION', // Use Supabase session ID or a fallback
+                data: {
+                    userid: c3UserId,
+                    // Spread all game session data into the 'data' object
+                    ...sessionData
+                }
+            };
+
+            console.log("Sending data to Channel 3:", channel3Payload);
+
+            const c3ApiCallPromise = fetch('https://channel3.gg/api/postgamestats', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(channel3Payload)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    // Still good to get the text for error messages if it's not 'ok'
+                    return response.text().then(text => { throw new Error(`Channel 3 API error: ${response.status} - ${text}`) });
+                }
+                console.log("Successfully sent game stats to Channel 3.");
+                // --- KERNEL OF THE FIX ---
+                // If you don't expect or need the response as JSON, don't try to parse it.
+                // Just return the response object itself, or nothing.
+                return; // Or return response; if you wanted to inspect it later without parsing.
+            })
+            .catch(error => {
+                console.error("Error sending stats to Channel 3:", error);
+            });
+
+            promises.push(c3ApiCallPromise);
+        } else if (isChannel3 && !c3UserId) {
+            console.warn("Channel 3 environment detected, but no c3UserId found. Skipping stats submission to Channel 3.");
+        }
+        // --- END Channel 3 API Call ---
+
+
+        const results = await Promise.allSettled(promises); // Use allSettled to ensure all promises run even if one fails
+
+        // Check Supabase Log Result
+        const supabaseLogResult = results[0];
+        if (supabaseLogResult && supabaseLogResult.status === 'rejected') {
+            console.error("Supabase Log Insert Error:", supabaseLogResult.reason);
+        } else if (supabaseLogResult && supabaseLogResult.status === 'fulfilled') {
+            console.log("Supabase Log Insert Success");
+        }
+
+        // Check Supabase Stats RPC Result (only if it was attempted)
+        if (targetId && results[1]) {
+            const supabaseRpcResult = results[1];
+            if (supabaseRpcResult.status === 'rejected') {
+                console.error("Supabase RPC Stats Update Error:", supabaseRpcResult.reason);
+            } else if (supabaseRpcResult.status === 'fulfilled') {
+                console.log("Supabase RPC Stats Update Success");
+            }
+        }
+        // Channel 3 result is handled within its promise chain
+        
+
     } catch (err) {
-        console.error("Error logging session:", err);
+        console.error("Unexpected error in logGameSession:", err);
     }
   };
 
@@ -775,10 +908,17 @@ function App() {
 
   return (
     <>
-      <div onClick={() => setSplash(false)} className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900 transition-opacity duration-1000 ${splash ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-        <img src="./logo.png" alt="Dwarf Wars" className="w-64 h-auto mb-8 animate-in fade-in zoom-in duration-1000" />
-        <div className="text-yellow-500 text-xs tracking-[0.5em] font-bold animate-pulse">LOADING REALM...</div>
-      </div>
+  <div onClick={() => setSplash(false)} className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900 transition-opacity duration-1000 ${splash ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+    <img src="./logo.png" alt="Dwarf Wars" className="w-64 h-auto mb-8 animate-in fade-in zoom-in duration-1000" />
+
+    <div className="text-yellow-500 text-xs tracking-[0.5em] font-bold animate-pulse mb-2">LOADING REALM...</div>
+
+    {/* NEW STUDIO & VERSION INFO */}
+    <div className="flex flex-col items-center gap-1 opacity-50 animate-in slide-in-from-bottom-4 duration-1000 delay-500">
+        <span className="text-[10px] text-slate-400 font-mono uppercase tracking-widest">{GAME_META.studio}</span>
+        <span className="text-[9px] text-slate-600 font-mono">{GAME_META.version}</span>
+    </div>
+  </div>
 
       {showTagModal && session && (
         <GamerTagModal 
@@ -802,6 +942,7 @@ function App() {
       
       {gameState === 'playing' && <GameScreen 
           gamertag={userProfile?.gamertag || 'Wanderer'} 
+          userProfile={userProfile} // <-- ADD THIS LINE
           player={player} day={day} maxDays={MAX_DAYS} location={currentLocation} resources={resources} health={health} maxHealth={maxHealth} debt={debt} 
           currentPrices={currentPrices} log={log} eventMsg={eventMsg} flash={flash} 
           activeEvent={activeEvent} // UNIFIED EVENT
@@ -820,6 +961,7 @@ function App() {
           // UNIFIED HANDLERS
           onRoll={startRoll}
           onClose={closeEventModal}
+          debugGamertag={DEBUG_GAMERTAG}
       />}
     </>
   );

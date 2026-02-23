@@ -1,5 +1,11 @@
 import filter from 'leo-profanity';
 
+// --- METADATA ---
+export const GAME_META = {
+    version: "v1.1.2", // Change this number here to update everywhere!
+    studio: "2130 Studios"
+};
+
 export const RACES = [
     { 
       id: 'human', name: 'Human', desc: 'Versatile.',

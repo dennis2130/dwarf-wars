@@ -23,6 +23,7 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 - **Game Session Logging:** All game sessions are logged to the database, including player stats, upgrades acquired, and cause of death for analytics and balance improvements.
 - **Dynamic Leaderboard:** High scores are saved and displayed with multiple time-period filters: Daily (past 24 hours), Weekly (past 7 days), Monthly (past 30 days), and All Time rankings using Supabase backend.
 - **Google Authentication:** Log in with Google to save and load characters and scores.
+- **Channel 3 Integration:** Seamlessly play via Channel 3's in-game browser with automatic account linking. Profiles are automatically created and linked using Channel 3 user data, with profile migration support for existing Gamer Tags.
 - **User Profile Page:** View your lifetime statistics including total runs, lifetime profit, personal best score, deaths, dragons killed, and recent game history.
 - **Exit & Restart:** You can now exit the game at any time and restart a new session without reloading the page.
 - **Simulator:** Run automated simulations of thousands of games using the included script to analyze balance and strategies.
@@ -195,7 +196,7 @@ The travel mechanic triggers random events that affect gameplay:
 - **Build Tool:** Vite 7.2.4 with React plugin
 - **Styling:** Tailwind CSS 3.4.17 with PostCSS and Autoprefixer
 - **Backend & Database:** Supabase (PostgreSQL) for authentication, saved characters, leaderboards, game logs, and player profiles
-- **Authentication:** Supabase Google OAuth integration
+- **Authentication:** Supabase Google OAuth integration + Channel 3 In-Game Browser API support with automatic profile linking
 - **UI Icons:** lucide-react 0.563.0 (SVG-based icon library)
 - **Profanity Filtering:** leo-profanity 1.9.0 (for name and gamer tag validation)
 - **HTTP Client:** @supabase/supabase-js 2.94.1 for Supabase SDK
@@ -254,6 +255,20 @@ The project is organized with a clear separation of concerns:
 5. **Open in browser:**
 	- Visit [http://localhost:5173](http://localhost:5173) (or the port shown in your terminal)
 
+## Channel 3 Integration
+
+Dwarf Wars supports seamless integration with Channel 3's in-game browser platform:
+
+- **Automatic Authentication:** When accessed via Channel 3 (hostname includes `channel3.gg`), the game automatically fetches user data from the Channel 3 API endpoint `/api/me`.
+- **Smart Profile Linking:** On first login via Channel 3:
+  1. The app checks if a profile exists using the Channel 3 user ID
+  2. If not found, it searches for a profile by Gamer Tag to support legacy accounts
+  3. If a match is found, the profile is linked to the Channel 3 ID for future logins
+  4. If no profile exists, a new one is created and automatically linked
+- **Anonymous Session Support:** Channel 3 users are given anonymous Supabase sessions to enable game session logging and leaderboard functionality.
+- **Profile Ownership:** When accessed from Channel 3, the Gamer Tag modal is suppressed to respect Channel 3's own profile management.
+
+To deploy to Channel 3, ensure the application hostname resolves correctly and the `/api/me` endpoint is available in your Channel 3 environment.
 
 ## Simulator
 

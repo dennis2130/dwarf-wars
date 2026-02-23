@@ -17,9 +17,14 @@ export default function GameScreen({
     combatActions, hasTraded, 
     onRoll, // Generic Roll Handler (startRoll)
     onClose, // Generic Close Handler (closeEventModal)
-    onWork 
+    onWork, 
+    userProfile, 
+    debugGamertag
 }) {
     const [activeTab, setActiveTab] = useState('market');
+
+    // Determine if the current user is a debug user
+    const isDebugUser = userProfile?.gamertag === debugGamertag;
 
     return (
         <div className="min-h-screen bg-slate-900 text-slate-200 font-sans p-2 max-w-md mx-auto border-x border-slate-700 flex flex-col relative">
@@ -28,9 +33,18 @@ export default function GameScreen({
             <header className="flex justify-between items-start mb-4 border-b border-slate-700 pb-2 relative">
                 
                 {/* LEFT: Player Info */}
-                <div className="z-10">
-                    <h1 className="text-xl font-bold text-yellow-500 truncate max-w-[120px]">{gamertag}</h1>
-                    <p className="text-xs text-slate-400 capitalize">{player.race?.name} {player.class?.name}</p>
+                <div className="z-10 flex items-center gap-2"> {/* <-- MODIFIED: Added flex and gap */}
+                    {userProfile?.c3_profile_image && ( // <-- ADDED AVATAR HERE
+                        <img 
+                            src={userProfile.c3_profile_image} 
+                            alt="Player Avatar" 
+                            className="w-8 h-8 rounded-full border border-yellow-500 object-cover" 
+                        />
+                    )}
+                    <div>
+                        <h1 className="text-xl font-bold text-yellow-500 truncate max-w-[120px]">{gamertag}</h1>
+                        <p className="text-xs text-slate-400 capitalize">{player.race?.name} {player.class?.name}</p>
+                    </div>
                 </div>
 
                 {/* CENTER: Day Counter */}
@@ -163,9 +177,12 @@ export default function GameScreen({
             </button>
 
 
-            <div className="bg-black p-3 rounded-lg h-24 overflow-y-auto text-xs font-mono text-green-500 border border-slate-700 shadow-inner">
-                {log.map((entry, i) => <div key={i} className="mb-1 border-b border-gray-900 pb-1 last:border-0"> &gt; {entry}</div>)}
-            </div>
+            {/* Travel Log - Only render if it's the debug user */}
+            {isDebugUser && ( // <--- CONDITIONAL RENDERING HERE
+                <div className="bg-black p-3 rounded-lg h-24 overflow-y-auto text-xs font-mono text-green-500 border border-slate-700 shadow-inner">
+                    {log.map((entry, i) => <div key={i} className="mb-1 border-b border-gray-900 pb-1 last:border-0"> &gt; {entry}</div>)}
+                </div>
+            )}
 
             {/* SCREEN FLASH */}
             <div className={`fixed inset-0 pointer-events-none transition-opacity duration-300 ${flash === 'red' ? 'bg-red-500/30' : flash === 'green' ? 'bg-green-500/30' : flash === 'gold' ? 'bg-yellow-500/30' : 'opacity-0'}`}></div>

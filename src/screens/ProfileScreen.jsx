@@ -1,19 +1,29 @@
-import { User, X, Skull, Edit2} from 'lucide-react';
+import { User, X, Skull } from 'lucide-react'; // Removed Edit2 import
 
-export default function ProfileScreen({ profileData, onClose, userProfile, onEditTag }) {
+export default function ProfileScreen({ profileData, onClose, userProfile }) { // Removed onEditTag prop
     if (!profileData) return null;
     return (
         <div className="min-h-screen bg-slate-900 text-slate-200 p-4 max-w-md mx-auto border-x border-slate-700">
             
             <div className="flex justify-between items-center mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-yellow-500 flex items-center gap-2">
-                        <User size={24} className="text-yellow-500"/> 
-                        {userProfile?.gamertag || "COMMANDER"}
-                    </h1>
-                    <button onClick={onEditTag} className="text-[10px] text-blue-400 flex items-center gap-1 hover:text-blue-300 mt-1">
-                        <Edit2 size={10}/> Change Gamer Tag
-                    </button> 
+                <div className="flex items-center gap-3">
+                    {userProfile?.c3_profile_image && (
+                        <img 
+                            src={userProfile.c3_profile_image} 
+                            alt="Player Avatar" 
+                            className="w-10 h-10 rounded-full border border-yellow-500 object-cover" 
+                        />
+                    )}
+                    <div>
+                        <h1 className="text-2xl font-bold text-yellow-500 flex items-center gap-2">
+                            <User size={24} className="text-yellow-500"/> 
+                            {userProfile?.gamertag || "COMMANDER"}
+                        </h1>
+                        {/* REMOVED: No more button to change gamertag */}
+                        {/* <button onClick={onEditTag} className="text-[10px] text-blue-400 flex items-center gap-1 hover:text-blue-300 mt-1">
+                            <Edit2 size={10}/> Change Gamer Tag
+                        </button> */}
+                    </div>
                 </div>
                 <button onClick={onClose} className="p-2 bg-slate-800 rounded hover:bg-slate-700"><X size={20}/></button>  
             </div>                 

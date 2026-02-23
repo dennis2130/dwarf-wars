@@ -37,7 +37,7 @@ export default function HelpScreen({ onClose }) {
                     <h2 className="text-blue-400 font-bold uppercase tracking-widest border-b border-slate-700 mb-2">Controls</h2>
                     <ul className="text-sm text-slate-400 space-y-2 list-disc list-inside">
                         <li><strong>Travel:</strong> If you traded today, you move to a new city.</li>
-                        <li><strong>Work:</strong> If you haven't traded, you stay in town, heal slightly, and earn 50-200g.</li>
+                        <li><strong>Work:</strong> If you haven't traded, you do small jobs and earn 50-200g.</li>
                         <li><strong>MAX Button:</strong> Buys as many items as you can afford and carry.</li>
                         <li><strong>ALL Button:</strong> Sells your entire stock of an item instantly.</li>
                         <li><strong>Buy/Sell:</strong> Tap to trade one item, or hold down to trade quickly.</li>
