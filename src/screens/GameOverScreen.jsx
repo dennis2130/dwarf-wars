@@ -1,7 +1,7 @@
 import React from 'react';
-import { Skull, Trophy, Lock, Ban, HeartCrack, Gavel } from 'lucide-react';
+import { Skull, Trophy, Lock, Ban, HeartCrack, Gavel, ArrowLeft } from 'lucide-react'; // <-- ADD ArrowLeft here
 
-export default function GameOverScreen({ money, debt, health, race, isSaving, onRestart }) {
+export default function GameOverScreen({ money, debt, health, race, isSaving, onRestart, isChannel3 }) { // <-- ADD isChannel3 prop
     // Logic: Victory only happens if Debt is 0. 
     // Even if you are rich, if you didn't pay the debt, you lose.
     const isDead = health <= 0;
@@ -15,6 +15,8 @@ export default function GameOverScreen({ money, debt, health, race, isSaving, on
     let scenario = {
         title: "",
         color: "",
+        borderColor: "", // Added for Tailwind classes
+        bg: "",          // Added for Tailwind classes
         icon: null,
         description: "",
         quote: ""
@@ -24,7 +26,7 @@ export default function GameOverScreen({ money, debt, health, race, isSaving, on
         // --- DEFEAT SCENARIOS (Debt > 0) ---
         scenario.color = "text-red-600";
         scenario.borderColor = "border-red-900";
-        scenario.bg = "bg-black";
+        scenario.bg = "bg-black"; // Example background
         
         if (!isDead && canCoverDebt) {
             // Scenario 1: Alive, Wealthy, but didn't pay
@@ -55,7 +57,7 @@ export default function GameOverScreen({ money, debt, health, race, isSaving, on
         // --- VICTORY SCENARIOS (Debt == 0) ---
         scenario.color = "text-yellow-500";
         scenario.borderColor = "border-yellow-500/50";
-        scenario.bg = "bg-slate-900";
+        scenario.bg = "bg-slate-900"; // Example background
 
         if (isDead) {
             // Edge Case: Paid off debt, but died (e.g. from bleed or last fight)
@@ -114,7 +116,7 @@ export default function GameOverScreen({ money, debt, health, race, isSaving, on
                 <div className="mt-6 text-xs h-6">
                     {isSaving ? (
                         <span className="flex items-center justify-center gap-2 animate-pulse text-yellow-500">
-                             Saving to Vault...
+                            Saving to Vault...
                         </span>
                     ) : (
                         <span className="text-slate-500">Record Sealed</span>
@@ -122,6 +124,7 @@ export default function GameOverScreen({ money, debt, health, race, isSaving, on
                 </div>
             </div>
 
+            {/* Restart Button */}
             <button 
                 onClick={onRestart} 
                 className={`mt-12 px-10 py-4 rounded-full font-bold shadow-lg active:scale-95 transition-all hover:-translate-y-1 
@@ -131,6 +134,20 @@ export default function GameOverScreen({ money, debt, health, race, isSaving, on
             >
                 Start New Life
             </button>
+
+            {/* NEW: Return to C3 Button */}
+            {isChannel3 && ( // <-- Only show on Channel 3
+                <div className="mt-4">
+                    <a 
+                        href="https://channel3.gg/dwarf-wars/stats" // <-- Link to the specific stats page
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors text-sm font-semibold"
+                    >
+                        <ArrowLeft size={16}/> Return to C3
+                    </a>
+                </div>
+            )}
         </div>
     );
 }

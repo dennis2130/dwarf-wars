@@ -53,6 +53,7 @@ function App() {
   const [rollTarget, setRollTarget] = useState(null);
 
   const DEBUG_GAMERTAG = import.meta.env.VITE_DEBUG_GAMERTAG;
+  const isChannel3 = window.location.hostname.includes('channel3.gg');
 
   const MAX_DAYS = 31;
 
@@ -351,7 +352,7 @@ function App() {
         }
 
         // --- NEW: Channel 3 API Call ---
-        const isChannel3 = window.location.hostname.includes('channel3.gg');
+        
         const c3UserId = userProfile?.channel3_id; // This was stored during handleChannel3Login
 
         if (isChannel3 && c3UserId) {
@@ -938,7 +939,7 @@ function App() {
       
       {gameState === 'help' && <HelpScreen onClose={() => setGameState('start')} />}
 
-      {gameState === 'gameover' && <GameOverScreen money={resources.money} debt={debt} health={health} race={player.race?.name} isSaving={isSaving} onRestart={() => setGameState('start')} />}
+      {gameState === 'gameover' && <GameOverScreen money={resources.money} debt={debt} health={health} race={player.race?.name} isSaving={isSaving} onRestart={() => setGameState('start')} isChannel3={isChannel3} />}
       
       {gameState === 'playing' && <GameScreen 
           gamertag={userProfile?.gamertag || 'Wanderer'} 
