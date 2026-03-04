@@ -2,8 +2,76 @@ import filter from 'leo-profanity';
 
 // --- METADATA ---
 export const GAME_META = {
-    version: "v1.1.3", // Change this number here to update everywhere!
-    studio: "2130 Studios"
+    version: "v1.1.4", // Change this number here to update everywhere!
+    studio: "2130 Studios",
+    releaseNotes: [
+      {
+        version: "1.1.3",
+        date: "2026-02-24",
+        status: "current",
+        notes: [
+          "Enhanced Channel 3 integration for improved in-game browser compatibility",
+          "Improvements to game over screen handling with Channel 3 support",
+          "Better account linking and profile synchronization",
+          "Bug fixes and stability improvements for Channel 3 API communication",
+        ],
+      },
+      {
+        version: "1.1.2",
+        date: "2026-02-23",
+        status: "stable",
+        notes: [
+          "Full Channel 3 integration with automatic account linking",
+          "Channel 3 user authentication and profile support",
+          "Seamless profile migration for existing gamer tags",
+          "Support for Channel 3 profile images in user profiles",
+          "Comprehensive Channel 3 API integration finalized",
+          "Improved game session logging with Channel 3 data",
+        ],
+      },
+      {
+        version: "1.1.1",
+        date: "2026-02-08",
+        status: "archive",
+        notes: [
+          "Major overhaul of market system with improved pricing mechanics",
+          "Complete redesign of user profile pages with stats tracking",
+          "Enhanced character performance analytics and history",
+          "Optimization of trading calculations",
+          "Improved inventory management interface",
+        ],
+      },
+      {
+        version: "1.1.0",
+        date: "2026-02-09",
+        status: "archive",
+        notes: [
+          "Introduction of Dragon encounters with unique combat mechanics",
+          "Random build selection at game start for variety",
+          "Migration of events database to Supabase for better scalability",
+          "Screen cleanup and improved user interface",
+          "Enhanced random event system balance",
+          "New named characters for flavor events",
+        ],
+      },
+      {
+        version: "1.0.0",
+        date: "2026-02-01",
+        status: "archive",
+        notes: [
+          "Initial release of Dwarf Wars on production servers",
+          "Complete trading system with 6 item types (rations, ale, potions, tools, scrolls, gems)",
+          "Combat system with 6 races and 6 classes with unique bonuses",
+          "4 unique locations with dynamic pricing and risk mechanics",
+          "Real-time leaderboards with daily, weekly, monthly, and all-time filters",
+          "Google authentication and character profile management",
+          "Game session logging and comprehensive analytics",
+          "Profanity filtering for gamer tags",
+          "31-day gameplay with debt interest mechanics",
+          "Upgrade system with permanent stat-boosting items",
+        ],
+      },
+    ]
 };
 
 export const RACES = [
@@ -25,7 +93,7 @@ export const RACES = [
     { 
       id: 'orc', name: 'Orc', desc: 'Intimidating.',
       bonus: 'Huge Inventory & Strong',
-      stats: { inventory: 40, health: 20, buyMod: -0.10, sellMod: -0.10, combat: 2 } 
+      stats: { inventory: 40, health: 20, buyMod: -0.05, sellMod: -0.05, combat: 2 } 
     },
         { 
       id: 'kobold', name: 'Kobold', desc: 'Dragon Servant.',
@@ -47,7 +115,7 @@ export const CLASSES = [
     },
     { 
       id: 'merchant', name: 'Merchant', desc: 'Born to trade.',
-      startingMoney: 1000, 
+      startingMoney: 2000, 
       startingDebt: 10000
     },
     { 

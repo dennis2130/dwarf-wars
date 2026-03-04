@@ -801,52 +801,65 @@ function App() {
 
   const buyItem = (item) => {
     const cost = getBuyPrice(currentPrices[item]);
+    const totalItems = Object.values(resources.inventory).reduce((a, b) => a + b.count, 0);
+    
+    // Check conditions before updating
+    if (totalItems >= maxInventory || resources.money < cost) return;
+    
     setResources(prev => {
-        const currentMoney = prev.money; const currentInv = prev.inventory;
-        const totalItems = Object.values(currentInv).reduce((a, b) => a + b.count, 0);
-        if (totalItems >= maxInventory || currentMoney < cost) return prev;
+        const currentInv = prev.inventory;
         const currentItemData = currentInv[item];
         const totalValue = (currentItemData.count * currentItemData.avg) + cost;
-        return { money: currentMoney - cost, inventory: { ...currentInv, [item]: { count: currentItemData.count + 1, avg: totalValue / (currentItemData.count + 1) } } };
+        return { money: prev.money - cost, inventory: { ...currentInv, [item]: { count: currentItemData.count + 1, avg: totalValue / (currentItemData.count + 1) } } };
     });
     setHasTraded(true);
-  };
+};
 
-  const buyMax = (item) => {
+const buyMax = (item) => {
     const cost = getBuyPrice(currentPrices[item]);
+    const totalItems = Object.values(resources.inventory).reduce((a, b) => a + b.count, 0);
+    const spaceLeft = maxInventory - totalItems;
+    const canAfford = Math.floor(resources.money / cost);
+    const amountToBuy = Math.min(spaceLeft, canAfford);
+    
+    // Check if action is possible
+    if (amountToBuy <= 0) return;
+    
     setResources(prev => {
-        const totalItems = Object.values(prev.inventory).reduce((a, b) => a + b.count, 0);
-        const spaceLeft = maxInventory - totalItems;
-        const canAfford = Math.floor(prev.money / cost);
-        const amountToBuy = Math.min(spaceLeft, canAfford);
-        if (amountToBuy <= 0) return prev; 
         const currentItemData = prev.inventory[item];
         const totalCost = amountToBuy * cost;
         const totalValue = (currentItemData.count * currentItemData.avg) + totalCost;
         return { money: prev.money - totalCost, inventory: { ...prev.inventory, [item]: { count: currentItemData.count + amountToBuy, avg: totalValue / (currentItemData.count + amountToBuy) } } };
     });
     setHasTraded(true);
-  };
+};
 
-  const sellItem = (item) => {
+const sellItem = (item) => {
+    const currentCount = resources.inventory[item].count;
+    
+    // Check if item exists to sell
+    if (currentCount <= 0) return;
+    
+    const value = getSellPrice(currentPrices[item]);
     setResources(prev => {
         const currentInv = prev.inventory;
-        if (currentInv[item].count <= 0) return prev;
-        const value = getSellPrice(currentPrices[item]); 
         return { money: prev.money + value, inventory: { ...currentInv, [item]: { ...currentInv[item], count: currentInv[item].count - 1 } } };
     });
     setHasTraded(true);
-  };
+};
 
-  const sellAll = (item) => {
+const sellAll = (item) => {
+    const count = resources.inventory[item].count;
+    
+    // Check if items exist to sell
+    if (count <= 0) return;
+    
+    const value = getSellPrice(currentPrices[item]);
     setResources(prev => {
-        const count = prev.inventory[item].count;
-        if (count <= 0) return prev;
-        const value = getSellPrice(currentPrices[item]);
         return { money: prev.money + (value * count), inventory: { ...prev.inventory, [item]: { count: 0, avg: 0 } } };
     });
     setHasTraded(true);
-  };
+};
 
   const buyUpgrade = (upgrade) => {
     if (resources.money < upgrade.cost) return setLog(prev => ["Too expensive!", ...prev]);
