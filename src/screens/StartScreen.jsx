@@ -5,14 +5,14 @@ import { Shield, Menu, User, LogOut, BookOpen, ArrowLeft } from 'lucide-react';
 export default function StartScreen({ 
     player, setPlayer, 
     session, leaderboard, 
-    onLogin, onLogout, onStart, onShowProfile, onShowHelp, userProfile
+    onLogin, onLogout, onStart, onShowProfile, onShowHelp, onShowTools, userProfile
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [leaderboardTab, setLeaderboardTab] = useState('day'); 
 
         // --- Determine if running on Channel 3 ---
     const isChannel3 = window.location.hostname.includes('channel3.gg'); 
-    //const isChannel3 = true; 
+    //const isChannel3 = true; // TESTING FLAG - Uncomment to simulate C3 environment during local development
     
      // --- SCROLL LOGIC ---
     const scrollRef = useRef(null);
@@ -153,11 +153,12 @@ export default function StartScreen({
             {/* RETURN TO C3 BUTTON */}
             {isChannel3 && ( 
                 <div className="mb-1 text-left">
-                    <button // Changed from <a> to <button>
+                    <button
                         onClick={handleReturnToC3} 
-                        className="inline-flex items-center gap-1 text-yellow-500 hover:text-blue-300 transition-colors text-sm font-semibold"
+                        className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
                     >
-                        <ArrowLeft size={16}/> Return to C3
+                        <ArrowLeft size={20} className="text-white"/> 
+                        <img src="./channel3-logo.png" alt="Channel 3" className="h-6 w-auto" />
                     </button>
                 </div>
             )}
@@ -258,6 +259,18 @@ export default function StartScreen({
                     Read Rules & Lore
                 </button>
             </div>
+
+            {/* DEV TOOLS BUTTON - ONLY IN DEVELOPMENT */}
+            {import.meta.env.DEV && (
+                <div className="mt-4 flex justify-center">
+                    <button 
+                        onClick={onShowTools} 
+                        className="flex items-center gap-2 px-4 py-2 bg-orange-900/50 hover:bg-orange-800 border border-orange-500/50 rounded-full text-orange-400 text-xs font-bold uppercase tracking-widest shadow-lg hover:shadow-orange-500/20 transition-all active:scale-95"
+                    >
+                        🔧 Event Manager
+                    </button>
+                </div>
+            )}
 
             <div className="text-center text-[10px] text-slate-600 font-mono pb-4">
             <p>{GAME_META.studio}</p>

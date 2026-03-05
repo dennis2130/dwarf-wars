@@ -2,13 +2,43 @@ import filter from 'leo-profanity';
 
 // --- METADATA ---
 export const GAME_META = {
-    version: "v1.1.4", // Change this number here to update everywhere!
+    version: "v1.1.5", // Change this number here to update everywhere!
     studio: "2130 Studios",
     releaseNotes: [
       {
+        version: "1.1.5",
+        date: "2026-03-04",
+        status: "current",
+        notes: [
+          "Event Manager development tool for creating and testing game events",
+          "Form-based event configuration with real-time JSON preview",
+          "Ability to create, edit, and manage combat/skill check event configs",
+          "Supabase integration for event persistence and global event pool management",
+          "Dev tools accessible in development mode only from start screen",
+          "Channel 3 logo integration on navigation buttons",
+          "Arrow icon styling improvements on return buttons",
+          "Enhanced game logs analyzer with comprehensive performance tables",
+          "Race balance analysis: win rates, death rates, average scores by race",
+          "Class balance analysis: performance breakdown by class",
+          "Race/Class combo analysis: top 15 combinations ranked by performance",
+          "Quit game filtering: excludes Quit (Menu) and Quit (Restart) from statistics for accuracy",
+          "RLS bypass with SERVICE_ROLE_KEY support for secure database analysis",
+        ],
+      },
+      {
+        version: "1.1.4",
+        date: "2026-03-03",
+        status: "stable",
+    notes: [
+      "Rebalanced Orc and Merchant race stats for improved viability",
+      "Increased useLongPress delay for better UX on button interactions",
+      "Fixed hasTraded flag being set on failed trade actions (insufficient funds/inventory)",
+    ],
+  },
+      {
         version: "1.1.3",
         date: "2026-02-24",
-        status: "current",
+        status: "stable",
         notes: [
           "Enhanced Channel 3 integration for improved in-game browser compatibility",
           "Improvements to game over screen handling with Channel 3 support",

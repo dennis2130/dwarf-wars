@@ -1,0 +1,666 @@
+import { useState, useEffect, useCallback } from "react";
+
+const SUPABASE_URL = "https://mswtikjdftgyykcvxqhg.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zd3Rpa2pkZnRneXlrY3Z4cWhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NzE1OTYsImV4cCI6MjA4NTQ0NzU5Nn0.dC2Rdfptw_Ocd8VG4B73lCjrQ5854t3u4jy1CpxjuF0";
+
+const headers = {
+  "Content-Type": "application/json",
+  apikey: SUPABASE_KEY,
+  Authorization: `Bearer ${SUPABASE_KEY}`,
+};
+
+const EVENT_TYPES = ["combat", "skill_check", "positive", "economy", "flavor"];
+
+const TYPE_META = {
+  combat:      { color: "#c0392b", glyph: "⚔️", label: "Combat" },
+  skill_check: { color: "#2980b9", glyph: "🎯", label: "Skill Check" },
+  positive:    { color: "#27ae60", glyph: "✨", label: "Positive" },
+  economy:     { color: "#f39c12", glyph: "📈", label: "Economy" },
+  flavor:      { color: "#8e44ad", glyph: "🌙", label: "Flavor" },
+};
+
+const EMPTY_EVENT = {
+  slug: "",
+  type: "flavor",
+  text: "",
+  risk_weight: 10,
+  req_net_worth: 0,
+  is_active: true,
+  config: {},
+};
+
+async function fetchEvents() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/game_events?select=*&order=type,slug`,
+    { headers }
+  );
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function upsertEvent(event) {
+  const method = event.id ? "PATCH" : "POST";
+  const url = event.id
+    ? `${SUPABASE_URL}/rest/v1/game_events?id=eq.${event.id}`
+    : `${SUPABASE_URL}/rest/v1/game_events`;
+  const body = { ...event };
+  if (!body.id) delete body.id;
+  delete body.created_at;
+  const res = await fetch(url, {
+    method,
+    headers: { ...headers, Prefer: "return=representation" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function deleteEvent(id) {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/game_events?id=eq.${id}`,
+    { method: "DELETE", headers }
+  );
+  if (!res.ok) throw new Error(await res.text());
+}
+
+// ── JSON editor with validation ────────────────────────────────────────────
+function JsonEditor({ value, onChange }) {
+  const [raw, setRaw] = useState(() => JSON.stringify(value, null, 2));
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    setRaw(JSON.stringify(value, null, 2));
+  }, [value]);
+
+  const handle = (v) => {
+    setRaw(v);
+    try {
+      const parsed = JSON.parse(v);
+      setErr(null);
+      onChange(parsed);
+    } catch (e) {
+      setErr("Invalid JSON");
+    }
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <textarea
+        value={raw}
+        onChange={(e) => handle(e.target.value)}
+        rows={6}
+        style={{
+          width: "100%",
+          background: "#0a0a0a",
+          color: err ? "#e74c3c" : "#a8d8a8",
+          border: `1px solid ${err ? "#e74c3c" : "#2a2a2a"}`,
+          borderRadius: 6,
+          fontFamily: "'Courier New', monospace",
+          fontSize: 12,
+          padding: "10px",
+          resize: "vertical",
+          boxSizing: "border-box",
+        }}
+      />
+      {err && (
+        <div style={{ color: "#e74c3c", fontSize: 11, marginTop: 3 }}>{err}</div>
+      )}
+    </div>
+  );
+}
+
+// ── Event Form Modal ───────────────────────────────────────────────────────
+function EventModal({ event, onSave, onClose, saving }) {
+  const [form, setForm] = useState(event ? { ...event } : { ...EMPTY_EVENT });
+  const [jsonErr, setJsonErr] = useState(false);
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const handleSubmit = () => {
+    if (!form.slug.trim()) return alert("Slug is required.");
+    if (!form.text.trim()) return alert("Text is required.");
+    onSave(form);
+  };
+
+  const meta = TYPE_META[form.type] || TYPE_META.flavor;
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0,
+        background: "rgba(0,0,0,0.85)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        zIndex: 1000, padding: 20,
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        style={{
+          background: "#111",
+          border: `1px solid ${meta.color}44`,
+          borderTop: `3px solid ${meta.color}`,
+          borderRadius: 12,
+          width: "100%", maxWidth: 620,
+          maxHeight: "90vh", overflowY: "auto",
+          padding: 28,
+          boxShadow: `0 0 40px ${meta.color}22`,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+          <h2 style={{ color: "#f5e6c8", fontFamily: "'Georgia', serif", fontSize: 20, margin: 0 }}>
+            {event?.id ? "✏️ Edit Event" : "➕ New Event"}
+          </h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#666", fontSize: 22, cursor: "pointer" }}>×</button>
+        </div>
+
+        <div style={{ display: "grid", gap: 16 }}>
+          {/* Slug */}
+          <Field label="Slug (unique identifier)">
+            <input
+              value={form.slug}
+              onChange={(e) => set("slug", e.target.value)}
+              placeholder="e.g. dragon_attack"
+              style={inputStyle}
+            />
+          </Field>
+
+          {/* Type */}
+          <Field label="Event Type">
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {EVENT_TYPES.map((t) => {
+                const m = TYPE_META[t];
+                const active = form.type === t;
+                return (
+                  <button
+                    key={t}
+                    onClick={() => set("type", t)}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: 20,
+                      border: `1px solid ${active ? m.color : "#333"}`,
+                      background: active ? `${m.color}22` : "transparent",
+                      color: active ? m.color : "#666",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {m.glyph} {m.label}
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+
+          {/* Text */}
+          <Field label="Event Text (shown to player)">
+            <textarea
+              value={form.text}
+              onChange={(e) => set("text", e.target.value)}
+              rows={3}
+              placeholder="A dragon swoops from the clouds..."
+              style={{ ...inputStyle, resize: "vertical", fontFamily: "inherit" }}
+            />
+          </Field>
+
+          {/* Risk Weight & Net Worth */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <Field label={`Risk Weight: ${form.risk_weight}`}>
+              <input
+                type="range" min={1} max={100}
+                value={form.risk_weight}
+                onChange={(e) => set("risk_weight", Number(e.target.value))}
+                style={{ width: "100%", accentColor: meta.color }}
+              />
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#555" }}>
+                <span>Rare (1)</span><span>Common (100)</span>
+              </div>
+            </Field>
+            <Field label="Min Net Worth (gold)">
+              <input
+                type="number" min={0}
+                value={form.req_net_worth}
+                onChange={(e) => set("req_net_worth", Number(e.target.value))}
+                style={inputStyle}
+              />
+            </Field>
+          </div>
+
+          {/* Active toggle */}
+          <Field label="Status">
+            <button
+              onClick={() => set("is_active", !form.is_active)}
+              style={{
+                padding: "8px 20px",
+                borderRadius: 6,
+                border: `1px solid ${form.is_active ? "#27ae60" : "#555"}`,
+                background: form.is_active ? "#27ae6022" : "#1a1a1a",
+                color: form.is_active ? "#27ae60" : "#777",
+                cursor: "pointer",
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              {form.is_active ? "✓ Active" : "○ Inactive"}
+            </button>
+          </Field>
+
+          {/* Config JSON */}
+          <Field label="Config (JSON)">
+            <JsonEditor
+              value={form.config}
+              onChange={(v) => set("config", v)}
+            />
+            <div style={{ fontSize: 11, color: "#555", marginTop: 4 }}>
+              Store event-specific data: damage ranges, gold rewards, DC thresholds, etc.
+            </div>
+          </Field>
+        </div>
+
+        <div style={{ display: "flex", gap: 12, marginTop: 28, justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={btnSecondary}>Cancel</button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            style={{ ...btnPrimary, background: meta.color, opacity: saving ? 0.6 : 1 }}
+          >
+            {saving ? "Saving…" : event?.id ? "Save Changes" : "Create Event"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <div style={{ color: "#a08060", fontSize: 12, fontWeight: 600, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Event Card ─────────────────────────────────────────────────────────────
+function EventCard({ event, onEdit, onDelete, onToggle }) {
+  const meta = TYPE_META[event.type] || TYPE_META.flavor;
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <div
+      style={{
+        background: "#111",
+        border: `1px solid #1e1e1e`,
+        borderLeft: `3px solid ${event.is_active ? meta.color : "#333"}`,
+        borderRadius: 8,
+        padding: "14px 16px",
+        display: "grid",
+        gridTemplateColumns: "1fr auto",
+        gap: 10,
+        opacity: event.is_active ? 1 : 0.5,
+        transition: "opacity 0.2s",
+      }}
+    >
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <span style={{ fontSize: 14 }}>{meta.glyph}</span>
+          <span style={{ color: "#f5e6c8", fontWeight: 700, fontSize: 14, fontFamily: "'Georgia', serif" }}>
+            {event.slug}
+          </span>
+          <span style={{
+            fontSize: 10, padding: "2px 8px", borderRadius: 12,
+            background: `${meta.color}22`, color: meta.color,
+            border: `1px solid ${meta.color}44`,
+            fontWeight: 600, letterSpacing: 0.5,
+          }}>
+            {meta.label}
+          </span>
+          {event.req_net_worth > 0 && (
+            <span style={{ fontSize: 10, color: "#f39c12", padding: "2px 6px", border: "1px solid #f39c1244", borderRadius: 10 }}>
+              💰 {event.req_net_worth.toLocaleString()}+
+            </span>
+          )}
+        </div>
+        <div style={{ color: "#888", fontSize: 13, lineHeight: 1.5, marginBottom: 6 }}>
+          {event.text?.length > 120 ? event.text.slice(0, 120) + "…" : event.text}
+        </div>
+        <div style={{ display: "flex", gap: 16, fontSize: 11, color: "#555" }}>
+          <span>Weight: <span style={{ color: "#a08060" }}>{event.risk_weight}</span></span>
+          {Object.keys(event.config || {}).length > 0 && (
+            <span style={{ color: "#555" }}>⚙️ config: {Object.keys(event.config).join(", ")}</span>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+        <button onClick={() => onEdit(event)} style={btnIconStyle("#4a90d9")}>Edit</button>
+        <button onClick={() => onToggle(event)} style={btnIconStyle(event.is_active ? "#f39c12" : "#27ae60")}>
+          {event.is_active ? "Disable" : "Enable"}
+        </button>
+        {confirming ? (
+          <div style={{ display: "flex", gap: 4 }}>
+            <button onClick={() => { setConfirming(false); onDelete(event.id); }} style={btnIconStyle("#e74c3c")}>Confirm</button>
+            <button onClick={() => setConfirming(false)} style={btnIconStyle("#555")}>No</button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirming(true)} style={btnIconStyle("#e74c3c")}>Delete</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main App ───────────────────────────────────────────────────────────────
+export default function EventManager({ onClose }) {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [modal, setModal] = useState(null); // null | {event}
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [filterType, setFilterType] = useState("all");
+  const [filterActive, setFilterActive] = useState("all");
+  const [search, setSearch] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      setEvents(await fetchEvents());
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const showToast = (msg, ok = true) => {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleSave = async (form) => {
+    setSaving(true);
+    try {
+      await upsertEvent(form);
+      showToast(form.id ? "Event updated!" : "Event created!");
+      setModal(null);
+      await load();
+    } catch (e) {
+      showToast("Error: " + e.message, false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await deleteEvent(id);
+      showToast("Event deleted.");
+      setEvents((ev) => ev.filter((e) => e.id !== id));
+    } catch (e) {
+      showToast("Error: " + e.message, false);
+    }
+  };
+
+  const handleToggle = async (event) => {
+    try {
+      await upsertEvent({ ...event, is_active: !event.is_active });
+      setEvents((ev) => ev.map((e) => e.id === event.id ? { ...e, is_active: !e.is_active } : e));
+      showToast(`Event ${!event.is_active ? "enabled" : "disabled"}.`);
+    } catch (e) {
+      showToast("Error: " + e.message, false);
+    }
+  };
+
+  const filtered = events.filter((e) => {
+    if (filterType !== "all" && e.type !== filterType) return false;
+    if (filterActive === "active" && !e.is_active) return false;
+    if (filterActive === "inactive" && e.is_active) return false;
+    if (search && !e.slug.includes(search) && !e.text?.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  const countByType = (type) => events.filter((e) => e.type === type).length;
+  const activeCount = events.filter((e) => e.is_active).length;
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "#0c0b09",
+      backgroundImage: "radial-gradient(ellipse at 20% 0%, #1a1200 0%, transparent 60%), radial-gradient(ellipse at 80% 100%, #0a0d1a 0%, transparent 60%)",
+      fontFamily: "'Segoe UI', system-ui, sans-serif",
+      color: "#d4c4a0",
+      padding: "0 0 60px",
+    }}>
+      {/* Header */}
+      <div style={{
+        borderBottom: "1px solid #1e1a12",
+        padding: "22px 32px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        background: "linear-gradient(to right, #0f0d09, #111008)",
+        position: "sticky", top: 0, zIndex: 100,
+        backdropFilter: "blur(8px)",
+      }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 28 }}>⚔️</span>
+            <div>
+              <h1 style={{
+                fontFamily: "'Georgia', 'Times New Roman', serif",
+                fontSize: 22, fontWeight: 700,
+                color: "#c9a84c",
+                margin: 0, letterSpacing: 1,
+                textShadow: "0 0 20px #c9a84c55",
+              }}>
+                Dwarf Wars
+              </h1>
+              <div style={{ color: "#665040", fontSize: 12, letterSpacing: 2, textTransform: "uppercase" }}>
+                Event Manager
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <div style={{ fontSize: 13, color: "#665040" }}>
+            <span style={{ color: "#c9a84c", fontWeight: 700 }}>{activeCount}</span>/{events.length} active
+          </div>
+          <button
+            onClick={() => setModal({ event: null })}
+            style={{
+              ...btnPrimary,
+              background: "linear-gradient(135deg, #c9a84c, #a0762e)",
+              color: "#0c0b09",
+              fontWeight: 700,
+              fontSize: 14,
+              padding: "10px 22px",
+              boxShadow: "0 2px 12px #c9a84c33",
+            }}
+          >
+            + New Event
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              ...btnPrimary,
+              background: "#2a2421",
+              border: "1px solid #3a3530",
+              color: "#d4c4a0",
+              fontWeight: 600,
+              fontSize: 13,
+              padding: "10px 16px",
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => e.target.style.background = "#3a3530"}
+            onMouseLeave={(e) => e.target.style.background = "#2a2421"}
+          >
+            ← Back
+          </button>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: "28px 24px 0" }}>
+        {/* Stats row */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
+          {EVENT_TYPES.map((t) => {
+            const m = TYPE_META[t];
+            return (
+              <div key={t} style={{
+                padding: "8px 14px", borderRadius: 8,
+                background: "#111", border: `1px solid ${m.color}33`,
+                fontSize: 13,
+              }}>
+                <span>{m.glyph} </span>
+                <span style={{ color: m.color, fontWeight: 700 }}>{countByType(t)}</span>
+                <span style={{ color: "#555", marginLeft: 4 }}>{m.label}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Filters */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search slug or text…"
+            style={{ ...inputStyle, flex: "1 1 180px", minWidth: 180 }}
+          />
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            style={{ ...inputStyle, flex: "0 0 auto" }}
+          >
+            <option value="all">All Types</option>
+            {EVENT_TYPES.map((t) => (
+              <option key={t} value={t}>{TYPE_META[t].label}</option>
+            ))}
+          </select>
+          <select
+            value={filterActive}
+            onChange={(e) => setFilterActive(e.target.value)}
+            style={{ ...inputStyle, flex: "0 0 auto" }}
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active Only</option>
+            <option value="inactive">Inactive Only</option>
+          </select>
+        </div>
+
+        {/* Event list */}
+        {loading ? (
+          <div style={{ textAlign: "center", padding: 60, color: "#555" }}>
+            <div style={{ fontSize: 32, marginBottom: 12, animation: "spin 1s linear infinite" }}>⚙️</div>
+            Loading events from the realm…
+          </div>
+        ) : error ? (
+          <div style={{ background: "#200", border: "1px solid #e74c3c44", borderRadius: 8, padding: 20, color: "#e74c3c" }}>
+            ⚠️ {error}
+            <button onClick={load} style={{ marginLeft: 12, ...btnSecondary, display: "inline-block" }}>Retry</button>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 60, color: "#444" }}>
+            {events.length === 0 ? "No events found. Create your first event!" : "No events match your filters."}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 10 }}>
+            {filtered.map((event) => (
+              <EventCard
+                key={event.id}
+                event={event}
+                onEdit={(e) => setModal({ event: e })}
+                onDelete={handleDelete}
+                onToggle={handleToggle}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Modal */}
+      {modal && (
+        <EventModal
+          event={modal.event}
+          onSave={handleSave}
+          onClose={() => setModal(null)}
+          saving={saving}
+        />
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)",
+          background: toast.ok ? "#1a2e1a" : "#2e1a1a",
+          border: `1px solid ${toast.ok ? "#27ae60" : "#e74c3c"}`,
+          color: toast.ok ? "#27ae60" : "#e74c3c",
+          padding: "12px 24px", borderRadius: 8,
+          fontSize: 14, fontWeight: 600,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+          zIndex: 2000,
+          animation: "fadeIn 0.2s ease",
+        }}>
+          {toast.msg}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity:0; transform: translateX(-50%) translateY(8px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0c0b09; }
+        ::-webkit-scrollbar-thumb { background: #2a2010; border-radius: 3px; }
+        select option { background: #111; color: #d4c4a0; }
+      `}</style>
+    </div>
+  );
+}
+
+// ── Shared styles ──────────────────────────────────────────────────────────
+const inputStyle = {
+  background: "#0f0f0f",
+  border: "1px solid #2a2a2a",
+  borderRadius: 6,
+  color: "#d4c4a0",
+  padding: "9px 12px",
+  fontSize: 14,
+  width: "100%",
+  boxSizing: "border-box",
+  outline: "none",
+};
+
+const btnPrimary = {
+  padding: "9px 20px",
+  borderRadius: 6,
+  border: "none",
+  cursor: "pointer",
+  fontSize: 14,
+  fontWeight: 600,
+  transition: "opacity 0.15s",
+};
+
+const btnSecondary = {
+  padding: "9px 20px",
+  borderRadius: 6,
+  border: "1px solid #333",
+  background: "transparent",
+  color: "#888",
+  cursor: "pointer",
+  fontSize: 14,
+};
+
+const btnIconStyle = (color) => ({
+  padding: "5px 10px",
+  borderRadius: 5,
+  border: `1px solid ${color}44`,
+  background: `${color}11`,
+  color: color,
+  cursor: "pointer",
+  fontSize: 12,
+  fontWeight: 600,
+  whiteSpace: "nowrap",
+});

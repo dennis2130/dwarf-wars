@@ -11,6 +11,7 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 - **Dynamic Locations:** Travel between unique locations (Royal City, Goblin Slums, Elven Forest, Iron Forge, Orc Badlands), each with their own price modifiers and risk levels.
 - **Random Events:** Encounter random events including dragon attacks, encounters with city watch, goblin pickpockets, merchant blessings, found treasure, market crashes, and price surges that affect your health, gold, or prices.
 - **Inventory & Upgrades:** Manage your inventory space and purchase upgrades including Pack Mule/Merchant Wagon (inventory expansion), Leather Jerkin/Chain Mail/Plate Armor (damage reduction), and class/race-specific weapons to increase carrying capacity, boost combat skills, or reduce damage taken. Consumables like the Elixir of Life restore 75% of your health.
+- **Smart Trade Validation:** The system intelligently tracks actual trades, only counting successful transactions toward your daily trading count. Failed purchases due to insufficient funds or inventory space don't incorrectly mark the day as "traded."
 - **Combat System:** Engage in dice-roll based combat encounters using the ScrambleDie mechanic. Purchase weapons (Dagger, Steel Sword, Mithril Axe) to increase your combat bonus and defeat enemies. Critical Successes (Nat 20s) deliver devastating blows with flavor text, while Critical Failures (Nat 1s) result in dramatic negative outcomes such as burnt inventory, maiming, or dragon fire.
 - **Consumables:** Use special items like the Elixir of Life to restore health during your adventure.
 - **Health & Survival:** Monitor your health and combat ability. If your health drops to zero, it's game over! Beware the **Bleed** mechanic: when your health drops below 25%, you take damage every time you travel.
@@ -119,11 +120,11 @@ The travel mechanic triggers random events that affect gameplay:
 	  - Human: Inventory +20, Health +10, Combat +1 (Versatile)
 	  - Dwarf: Health +40, Sell items for 10% more (Greedy Negotiator)
 	  - Elf: Buy items for 15% less, Inventory +5, Health -10 (Charismatic)
-	  - Orc: Inventory +40, Health +20, Combat +2, but pay 10% more and sell for 10% less (Intimidating)
+	  - Orc: Inventory +40, Health +20, Combat +2, but pay 10% more and sell for 10% less (Intimidating) *(Recently rebalanced for improved viability)*
 	  - Kobold: Inventory +30, Health -20, Combat +5 vs Dragons (Dragon Servant)
 	  - Halfling: Inventory +5, Health -15, Combat +5 vs Guards, Buy/Sell +5% (Slippery)
 	- **Classes (6 total):**
-	  - Merchant: 1000 Gold, 10000 Debt (Born to trade)
+	  - Merchant: 1000 Gold, 10000 Debt (Born to trade) *(Recently rebalanced for improved viability)*
 	  - Rogue: 300 Gold, 3000 Debt (Hidden in Shadows)
 	  - Warrior: 600 Gold, 6000 Debt (Fighter)
 	  - Bard: 600 Gold, 2000 Debt (Charismatic)
@@ -162,6 +163,7 @@ The travel mechanic triggers random events that affect gameplay:
   - **MAX Button:** Buy the maximum amount based on your available gold and inventory space.
   - **ALL Button:** Sell all items of a type instantly.
   - **Profit Color Coding:** Sell prices turn green if selling above your average cost, red if below.
+  - **Improved UX:** Long-press interactions now have optimized delays for smoother, more responsive button feedback.
 - **Armory & Stables Tab:** Purchase permanent upgrades (inventory, weapons, defense, consumables).
 - **Work & Travel Mechanics:** The primary action button adapts based on your trading activity:
   - **Work Mode (No Trades Today):** If you haven't bought or sold items during the current day, clicking "Work & Travel" keeps you in the current location. You earn 50-200 gold from odd jobs and may encounter random events. This is useful for healing up or making quick gold.
@@ -227,8 +229,15 @@ The project is organized with a clear separation of concerns:
   - `useLongPress.js` - Handles long-press interactions for continuous buy/sell actions with global event listeners to properly detect finger/mouse lift anywhere on screen
 - **`src/utils.jsx`** - Icon mapping function (`getIcon()`) for all tradeable items and equipment
 - **`src/supabaseClient.js`** - Supabase client initialization with environment variables
+- **`src/tools/`** - Development tools:
+  - `event_manager.jsx` - Event management interface for creating, editing, and testing game events with form-based configuration and JSON preview
 - **`scripts/simulate.js`** - Automated game simulator running thousands of games to analyze race/class balance, item values, and strategy effectiveness
-- **`scripts/analyze_logs.js`** - Game log analyzer that processes database records to calculate statistics and identify balance issues
+- **`scripts/analyze_logs.js`** - Comprehensive game log analyzer that processes database records to generate three performance analysis tables:
+  - **Race Balance:** Runs, average score, and death rate breakdown by race for meta analysis
+  - **Class Balance:** Performance metrics by class to identify over/underperforming classes
+  - **Race/Class Combos (Top 15):** Ranked combinations with detailed statistics for build viability analysis
+  - **Quit Filtering:** Automatically excludes Quit (Menu) and Quit (Restart) games for accurate completion-based statistics
+  - **Secure Access:** Uses SERVICE_ROLE_KEY to bypass RLS policies for complete data visibility
 - **`scripts/check_upgrades.js`** - Upgrade availability validator that tests class/race requirements and bans for all upgrades
 
 ## Setup & Installation
@@ -257,18 +266,44 @@ The project is organized with a clear separation of concerns:
 
 ## Channel 3 Integration
 
-Dwarf Wars supports seamless integration with Channel 3's in-game browser platform:
+Dwarf Wars provides seamless integration with Channel 3's in-game browser platform, including automatic account linking and profile management:
 
-- **Automatic Authentication:** When accessed via Channel 3 (hostname includes `channel3.gg`), the game automatically fetches user data from the Channel 3 API endpoint `/api/me`.
+- **Automatic Authentication:** When accessed via Channel 3 (hostname includes `channel3.gg`), the game automatically fetches user data from the Channel 3 API endpoint `/api/me` and initiates the authentication flow.
 - **Smart Profile Linking:** On first login via Channel 3:
   1. The app checks if a profile exists using the Channel 3 user ID
-  2. If not found, it searches for a profile by Gamer Tag to support legacy accounts
+  2. If not found, it searches for a profile by Gamer Tag to support legacy accounts and enable seamless migration
   3. If a match is found, the profile is linked to the Channel 3 ID for future logins
   4. If no profile exists, a new one is created and automatically linked
-- **Anonymous Session Support:** Channel 3 users are given anonymous Supabase sessions to enable game session logging and leaderboard functionality.
+- **Profile Image Support:** Channel 3 user profile images are automatically retrieved and stored for display in user profiles and leaderboards.
+- **Anonymous Session Support:** Channel 3 users are given anonymous Supabase sessions to enable game session logging, leaderboard functionality, and cross-platform statistics tracking.
+- **Post-Game Stats Submission:** Game session data is automatically submitted to Channel 3's analytics endpoint (`/api/postgamestats`) after each game concludes, enabling Channel 3-side statistics tracking and integrations.
 - **Profile Ownership:** When accessed from Channel 3, the Gamer Tag modal is suppressed to respect Channel 3's own profile management.
 
-To deploy to Channel 3, ensure the application hostname resolves correctly and the `/api/me` endpoint is available in your Channel 3 environment.
+To deploy to Channel 3, ensure the application hostname resolves correctly and the `/api/me` and `/api/postgamestats` endpoints are available in your Channel 3 environment. Set the required Vite environment variables: `VITE_C3_BOSS_ID`, `VITE_C3_CHEAT_CODE`, and `VITE_C3_GAME_ID`.
+
+## Development Tools
+
+### Event Manager (Development Only)
+
+The Event Manager is a powerful development tool for creating, editing, and testing game events. It's accessible only in development mode and appears as a 🔧 button on the start screen.
+
+**Features:**
+- **Event List:** Browse all events in the database with filtering by type and active status
+- **Create New Events:** Build new events from scratch with a guided form interface
+- **Event Configuration Form:** Define event properties including:
+  - Slug, type, and description text
+  - Risk weighting for random event pool selection
+  - Requirements (net worth, debt status, day constraints)
+  - Outcome configurations for success/failure/crit scenarios
+  - Effect definitions (gold, health, items, inventory changes)
+- **JSON Editor:** View and edit raw event JSON with real-time validation
+- **Supabase Integration:** All events persist to the database and are immediately available in-game
+- **Live Testing:** Create events and test them immediately in the next game session
+
+**Access:** 
+- Run `npm run dev` to start in development mode
+- Click "🔧 Event Manager" button on the start screen
+- Tool is hidden in production builds
 
 ## Simulator
 

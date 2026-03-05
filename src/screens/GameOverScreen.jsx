@@ -142,9 +142,10 @@ export default function GameOverScreen({ money, debt, health, race, isSaving, on
                         href="https://channel3.gg/dwarf-wars/stats" // <-- Link to the specific stats page
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors text-sm font-semibold"
+                        className="inline-flex items-center gap-1 hover:opacity-80 transition-opacity"
                     >
-                        <ArrowLeft size={16}/> Return to C3
+                        <ArrowLeft size={20} className="text-white"/> 
+                        <img src="./channel3-logo.png" alt="Channel 3" className="h-6 w-auto" />
                     </a>
                 </div>
             )}

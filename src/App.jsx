@@ -9,6 +9,7 @@ import ProfileScreen from './screens/ProfileScreen';
 import GameOverScreen from './screens/GameOverScreen';
 import HelpScreen from './screens/HelpScreen';
 import GamerTagModal from './screens/GamerTagModal';
+import EventManager from './tools/event_manager';
 
 function App() {
   // --- STATE ---
@@ -946,11 +947,13 @@ const sellAll = (item) => {
         />
       )}
 
-      {gameState === 'start' && <StartScreen player={buildSelection} setPlayer={setBuildSelection} session={session} leaderboard={leaderboard} onLogin={handleGoogleLogin} onLogout={handleLogout} onStart={startGame} onShowProfile={fetchProfile} onShowHelp={() => setGameState('help')} userProfile={userProfile} />}
+      {gameState === 'start' && <StartScreen player={buildSelection} setPlayer={setBuildSelection} session={session} leaderboard={leaderboard} onLogin={handleGoogleLogin} onLogout={handleLogout} onStart={startGame} onShowProfile={fetchProfile} onShowHelp={() => setGameState('help')} onShowTools={() => setGameState('event-manager')} userProfile={userProfile} />}
       
       {gameState === 'profile' && <ProfileScreen profileData={profileData} onClose={() => setGameState('start')} userProfile={userProfile}  onEditTag={() => setShowTagModal(true)}/>}
       
       {gameState === 'help' && <HelpScreen onClose={() => setGameState('start')} />}
+
+      {gameState === 'event-manager' && <EventManager onClose={() => setGameState('start')} />}
 
       {gameState === 'gameover' && <GameOverScreen money={resources.money} debt={debt} health={health} race={player.race?.name} isSaving={isSaving} onRestart={() => setGameState('start')} isChannel3={isChannel3} />}
       
