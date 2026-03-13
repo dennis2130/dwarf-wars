@@ -10,9 +10,11 @@ export default function StartScreen({
     const [menuOpen, setMenuOpen] = useState(false);
     const [leaderboardTab, setLeaderboardTab] = useState('day'); 
 
-        // --- Determine if running on Channel 3 ---
-    // const isChannel3 = window.location.hostname.includes('channel3.gg'); 
-    const isChannel3 = true; // TESTING FLAG - Uncomment to simulate C3 environment during local development
+    // Run C3 behavior for real Channel 3 hosts and local development only.
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+    const isChannel3Host = hostname.includes('channel3.gg');
+    const isLocalDev = import.meta.env.DEV || hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+    const isChannel3 = isChannel3Host || isLocalDev;
     
      // --- SCROLL LOGIC ---
     const scrollRef = useRef(null);
