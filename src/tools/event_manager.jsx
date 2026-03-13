@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import EventViewer from "./EventViewer";
 
 const SUPABASE_URL = "https://mswtikjdftgyykcvxqhg.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zd3Rpa2pkZnRneXlrY3Z4cWhnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NzE1OTYsImV4cCI6MjA4NTQ0NzU5Nn0.dC2Rdfptw_Ocd8VG4B73lCjrQ5854t3u4jy1CpxjuF0";
@@ -9,7 +10,7 @@ const headers = {
   Authorization: `Bearer ${SUPABASE_KEY}`,
 };
 
-const EVENT_TYPES = ["combat", "check", "heal", "money", "price", "flavor"];
+const EVENT_TYPES = ["combat", "check", "heal", "money", "price", "flavor", "c3_encounter", "c3_check"];
 
 const TYPE_META = {
   combat:  { color: "#c0392b", glyph: "⚔️",  label: "Combat" },
@@ -18,7 +19,11 @@ const TYPE_META = {
   money:   { color: "#f1c40f", glyph: "💰",  label: "Money" },
   price:   { color: "#f39c12", glyph: "📈",  label: "Price Shift" },
   flavor:  { color: "#8e44ad", glyph: "🌙",  label: "Flavor" },
+  c3_encounter: { color: "#3498db", glyph: "🤝", label: "C3 Encounter" },
+  c3_check:     { color: "#9b59b6", glyph: "🤝", label: "C3 Skill Check" },
 };
+
+const C3_CATEGORIES = ["gold", "gems", "health", "inventory"];
 
 const ITEMS = ["rations", "ale", "potions", "tools", "scrolls", "gems"];
 
@@ -66,8 +71,8 @@ function buildEffect(e) {
   if (e.health)              out.health            = Number(e.health);
   if (e.gold)                out.gold              = Number(e.gold);
   if (e.gold_pct)            out.gold_pct          = Number(e.gold_pct);
+  if (e.max_inventory)       out.max_inventory     = Number(e.max_inventory);
   if (e.add_item)          { out.add_item          = e.add_item; out.amount = Number(e.amount ?? 1); }
-  if (e.remove_all_item)     out.remove_all_item   = e.remove_all_item;
   if (e.zero_gold)           out.zero_gold         = true;
   if (e.clear_inventory)     out.clear_inventory   = true;
   if (e.clear_debt)          out.clear_debt        = true;
@@ -80,6 +85,22 @@ function buildConfig(type, cfg) {
   if (type === "heal")   return { value: cfg.value ?? 25 };
   if (type === "money")  return { value: cfg.value ?? 200 };
   if (type === "price")  return { value: cfg.value ?? 1.0 };
+  if (type === "c3_encounter") {
+    return { c3_encounter: true, category: cfg.category ?? "gold" };
+  }
+  if (type === "c3_check") {
+    const out = {};
+    for (const ok of ["fail", "success", "crit_fail", "crit_success"]) {
+      // Preserve existing effect if present, otherwise build from form
+      const effectVal = cfg.outcomes?.[ok]?.effect;
+      out[ok] = { text: cfg.outcomes?.[ok]?.text ?? "", effect: effectVal && Object.keys(effectVal).length > 0 ? effectVal : buildEffect(cfg.outcomes?.[ok]?.effect ?? {}) };
+    }
+    const result = { c3_encounter: true, category: cfg.category ?? "gold", stat: cfg.stat ?? "charisma", outcomes: out, difficulty: cfg.difficulty ?? 12 };
+    if (cfg.req_debt)                  result.req_debt    = true;
+    if (cfg.req_min_day !== "")        result.req_min_day = Number(cfg.req_min_day);
+    if (cfg.req_max_day !== "")        result.req_max_day = Number(cfg.req_max_day);
+    return result;
+  }
   if (type === "combat" || type === "check") {
     const out = {};
     for (const ok of ["fail", "success", "crit_fail", "crit_success"]) {
@@ -97,6 +118,25 @@ function buildConfig(type, cfg) {
 function parseConfig(type, raw) {
   if (!raw || type === "flavor") return {};
   if (type === "heal" || type === "money" || type === "price") return { value: raw.value };
+  if (type === "c3_encounter") {
+    return { category: raw.category ?? "gold" };
+  }
+  if (type === "c3_check") {
+    return {
+      category: raw.category ?? "gold",
+      stat: raw.stat ?? "charisma",
+      difficulty: raw.difficulty ?? 12,
+      req_debt: raw.req_debt ?? false,
+      req_min_day: raw.req_min_day ?? "",
+      req_max_day: raw.req_max_day ?? "",
+      outcomes: {
+        fail:         { text: raw.outcomes?.fail?.text ?? "",         effect: raw.outcomes?.fail?.effect ?? {} },
+        success:      { text: raw.outcomes?.success?.text ?? "",      effect: raw.outcomes?.success?.effect ?? {} },
+        crit_fail:    { text: raw.outcomes?.crit_fail?.text ?? "",    effect: raw.outcomes?.crit_fail?.effect ?? {} },
+        crit_success: { text: raw.outcomes?.crit_success?.text ?? "", effect: raw.outcomes?.crit_success?.effect ?? {} },
+      },
+    };
+  }
   if (type === "combat" || type === "check") {
     return {
       stat: raw.stat ?? "combat",
@@ -144,6 +184,10 @@ function EffectBuilder({ effect = {}, onChange }) {
           <input type="number" step="0.01" value={effect.gold_pct ?? ""} placeholder="none"
             onChange={(e) => set("gold_pct", e.target.value === "" ? "" : Number(e.target.value))} style={miniInput} />
         </MiniField>
+        <MiniField label="Inventory Space (+/-)">
+          <input type="number" value={effect.max_inventory ?? ""} placeholder="none"
+            onChange={(e) => set("max_inventory", e.target.value === "" ? "" : Number(e.target.value))} style={miniInput} />
+        </MiniField>
         <MiniField label="Give Item">
           <select value={effect.add_item ?? ""} onChange={(e) => set("add_item", e.target.value || null)} style={miniInput}>
             <option value="">— none —</option>
@@ -156,12 +200,6 @@ function EffectBuilder({ effect = {}, onChange }) {
               onChange={(e) => set("amount", Number(e.target.value))} style={miniInput} />
           </MiniField>
         )}
-        <MiniField label="Destroy All Item">
-          <select value={effect.remove_all_item ?? ""} onChange={(e) => set("remove_all_item", e.target.value || null)} style={miniInput}>
-            <option value="">— none —</option>
-            {ITEMS.map(i => <option key={i} value={i}>{i}</option>)}
-          </select>
-        </MiniField>
       </div>
 
       {/* Boolean toggles */}
@@ -229,6 +267,93 @@ function ConfigBuilder({ type, cfg, onChange }) {
       🌙 Flavor events have no config — they're purely atmospheric.
     </div>
   );
+
+  if (type === "c3_encounter") return (
+    <div style={{ display: "grid", gap: 16 }}>
+      <div style={{ padding: 16, background: "#0f0f1a", borderRadius: 8, border: "1px solid #2a3a5a", color: "#7fa8d1", fontSize: 13 }}>
+        🤝 <strong>C3 Player Encounters</strong><br/>These events automatically fetch a random Channel 3 player at runtime and personalize the encounter text with their name. The player receives a guaranteed positive reward based on the category.
+      </div>
+      <Field label="Encounter Category">
+        <select value={cfg.category ?? "gold"} onChange={(e) => set("category", e.target.value)} style={inputStyle}>
+          <option value="gold">💰 Gold</option>
+          <option value="gems">💎 Gems</option>
+          <option value="health">💚 Health</option>
+          <option value="inventory">🎒 Inventory</option>
+        </select>
+      </Field>
+    </div>
+  );
+
+  if (type === "c3_check") {
+    const outcomes = cfg.outcomes ?? EMPTY_OUTCOMES;
+    return (
+      <div style={{ display: "grid", gap: 18 }}>
+        <div style={{ padding: 16, background: "#1a0f0f", borderRadius: 8, border: "1px solid #5a2a2a", color: "#d1a0a8", fontSize: 13 }}>
+          🤝 <strong>C3 Skill Checks</strong><br/>Player helps another C3 adventurer with a task. They roll d20 with a stat check, and rewards scale based on the outcome (crit fail: 0%, fail: 25-75%, success: 75-100%, crit success: 100%+).
+        </div>
+        <Field label="Encounter Category">
+          <select value={cfg.category ?? "gold"} onChange={(e) => set("category", e.target.value)} style={inputStyle}>
+            <option value="gold">💰 Gold</option>
+            <option value="gems">💎 Gems</option>
+            <option value="health">💚 Health</option>
+            <option value="inventory">🎒 Inventory</option>
+          </select>
+        </Field>
+        {/* Mechanics row */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <MiniField label="Stat Used">
+            <select value={cfg.stat ?? "charisma"} onChange={(e) => set("stat", e.target.value)} style={inputStyle}>
+              <option value="combat">combat</option>
+              <option value="wisdom">wisdom</option>
+              <option value="charisma">charisma</option>
+              <option value="stealth">stealth</option>
+            </select>
+          </MiniField>
+          <MiniField label={`Difficulty (DC): ${cfg.difficulty ?? 12}`}>
+            <input type="range" min={5} max={25} value={cfg.difficulty ?? 12}
+              onChange={(e) => set("difficulty", Number(e.target.value))}
+              style={{ width: "100%", accentColor: "#c9a84c", marginTop: 6 }} />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#555" }}>
+              <span>Easy (5)</span><span style={{ color: "#c9a84c", fontWeight: 700 }}>{cfg.difficulty ?? 12}</span><span>Brutal (25)</span>
+            </div>
+          </MiniField>
+        </div>
+
+        {/* Conditions */}
+        <div>
+          <div style={{ color: "#665040", fontSize: 11, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>Conditions (optional)</div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <button onClick={() => set("req_debt", !cfg.req_debt)} style={{
+              padding: "7px 14px", borderRadius: 20, fontSize: 12, cursor: "pointer",
+              border: `1px solid ${cfg.req_debt ? "#c9a84c" : "#2a2a2a"}`,
+              background: cfg.req_debt ? "#c9a84c22" : "transparent",
+              color: cfg.req_debt ? "#c9a84c" : "#555",
+            }}>📜 Requires Active Debt</button>
+            <MiniField label="Min Day">
+              <input type="number" min={1} max={31} value={cfg.req_min_day ?? ""} placeholder="any"
+                onChange={(e) => set("req_min_day", e.target.value === "" ? "" : Number(e.target.value))}
+                style={{ ...miniInput, width: 80 }} />
+            </MiniField>
+            <MiniField label="Max Day">
+              <input type="number" min={1} max={31} value={cfg.req_max_day ?? ""} placeholder="any"
+                onChange={(e) => set("req_max_day", e.target.value === "" ? "" : Number(e.target.value))}
+                style={{ ...miniInput, width: 80 }} />
+            </MiniField>
+          </div>
+        </div>
+
+        {/* Outcomes */}
+        <div>
+          <div style={{ color: "#665040", fontSize: 11, letterSpacing: 1, textTransform: "uppercase", marginBottom: 10 }}>Outcomes & Effects</div>
+          {["crit_success", "success", "fail", "crit_fail"].map((ok) => (
+            <OutcomePanel key={ok} outcomeKey={ok}
+              data={outcomes[ok] ?? { text: "", effect: {} }}
+              onChange={(val) => setOutcome(ok, val)} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (type === "heal") return (
     <MiniField label="HP Restored">
@@ -575,6 +700,11 @@ export default function App() {
             + New Event
           </button>
         </div>
+      </div>
+
+      {/* Event Viewer Section */}
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 0 0" }}>
+        <EventViewer />
       </div>
 
       <div style={{ maxWidth: 880, margin: "0 auto", padding: "28px 24px 0" }}>

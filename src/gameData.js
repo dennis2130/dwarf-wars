@@ -2,13 +2,31 @@ import filter from 'leo-profanity';
 
 // --- METADATA ---
 export const GAME_META = {
-    version: "v1.1.5", // Change this number here to update everywhere!
+    version: "v1.1.6", // Change this number here to update everywhere!
     studio: "2130 Studios",
     releaseNotes: [
       {
+        version: "1.1.6",
+        date: "2026-03-12",
+        status: "current",
+        notes: [
+          "Added about 40 new Channel 3 c3_check and c3_encounter events to the Supabase event table",
+          "Extended runtime handlers so the new C3 event configs and outcomes resolve correctly in game flow",
+          "Channel 3 check events received a full voice pass for stronger flavor and more consistent tone",
+          "Failure and critical failure outcomes for C3 checks were reworked so bad rolls feel materially punishing",
+          "Added 13 new D&D-style monster encounters including goblins, trolls, hydras, vampires, liches, necromancers, and a beholder",
+          "Monster encounter rewards and item effects were standardized to the generic add_item + amount format",
+          "Negative item outcomes now resolve safely in runtime, preventing broken inventory behavior on loss effects",
+          "Deprecated remove_all_item outcomes were removed from live event configs instead of being supported going forward",
+          "Event Manager now supports max_inventory effects for event authoring",
+          "Event Viewer was upgraded into a better audit tool with active state badges, search, filters, and sorting",
+          "Fixed triggerGameOver to save scores correctly again",
+        ],
+      },
+      {
         version: "1.1.5",
         date: "2026-03-04",
-        status: "current",
+        status: "stable",
         notes: [
           "Event Manager development tool for creating and testing game events",
           "Form-based event configuration with real-time JSON preview",

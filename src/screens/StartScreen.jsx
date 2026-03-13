@@ -11,8 +11,8 @@ export default function StartScreen({
     const [leaderboardTab, setLeaderboardTab] = useState('day'); 
 
         // --- Determine if running on Channel 3 ---
-    const isChannel3 = window.location.hostname.includes('channel3.gg'); 
-    //const isChannel3 = true; // TESTING FLAG - Uncomment to simulate C3 environment during local development
+    // const isChannel3 = window.location.hostname.includes('channel3.gg'); 
+    const isChannel3 = true; // TESTING FLAG - Uncomment to simulate C3 environment during local development
     
      // --- SCROLL LOGIC ---
     const scrollRef = useRef(null);

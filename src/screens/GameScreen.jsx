@@ -8,7 +8,7 @@ import { UPGRADES } from '../gameData';
 import EventModal from '../components/EventModal';
 
 export default function GameScreen({ 
-    gamertag, player, day, maxDays, location, resources, health, maxHealth, debt, 
+    gamertag, player, day, maxDays, location, resources, health, maxHealth, maxInventory, debt, 
     currentPrices, log, eventMsg, flash, 
     activeEvent, // Unified Event State
     isRolling, rollTarget,
@@ -19,7 +19,8 @@ export default function GameScreen({
     onClose, // Generic Close Handler (closeEventModal)
     onWork, 
     userProfile, 
-    debugGamertag
+    debugGamertag,
+    c3_player // C3 Player Context for Encounters
 }) {
     const [activeTab, setActiveTab] = useState('market');
 
@@ -110,7 +111,7 @@ export default function GameScreen({
                             );
                         })}
                     </div>
-                    <InventoryGrid inventory={resources.inventory} maxInventory={playerItems.reduce((acc, i) => i.type === 'inventory' ? acc + i.value : acc, 50 + player.race.stats.inventory)} />
+                    <InventoryGrid inventory={resources.inventory} maxInventory={maxInventory} />
                 </>
             ) : (
                 <div className="mb-4 flex-grow space-y-2">
@@ -194,6 +195,7 @@ export default function GameScreen({
                 rollTarget={rollTarget}
                 onRoll={onRoll} 
                 onClose={onClose}
+                c3_player={c3_player}
                 combatActions={{
                     onRollComplete: combatActions.onRollComplete,
                     onRun: combatActions.onRun,

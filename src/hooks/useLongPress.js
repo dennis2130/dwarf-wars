@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 
-export function useLongPress(callback, ms = 1500) {
+export function useLongPress(callback, ms = 5000) {
   const timerRef = useRef(null);
 
   const stop = () => {

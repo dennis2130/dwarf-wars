@@ -52,6 +52,9 @@ function App() {
   const [activeEvent, setActiveEvent] = useState(null); 
   const [isRolling, setIsRolling] = useState(false);
   const [rollTarget, setRollTarget] = useState(null);
+  const [c3EncountersUsed, setC3EncountersUsed] = useState(0);
+  const [c3EncountersRemoved, setC3EncountersRemoved] = useState(false);
+  const [c3Player, setC3Player] = useState(null);
 
   const DEBUG_GAMERTAG = import.meta.env.VITE_DEBUG_GAMERTAG;
   const isChannel3 = window.location.hostname.includes('channel3.gg');
@@ -213,9 +216,49 @@ function App() {
   };
 
   const fetchEvents = async () => {
-    const { data, error } = await supabase.from('game_events').select('*').eq('is_active', true);
+    // In dev: load all events (including disabled) for testing
+    // On C3 production: only load active events
+    let query = supabase.from('game_events').select('*');
+    if (isChannel3) {
+      query = query.eq('is_active', true);
+    }
+    const { data, error } = await query;
     if (error) console.error("Error loading events:", error);
     else setEventPool(data || []);
+  };
+
+  const getRandomC3Player = async (excludeUserId) => {
+    try {
+      let query = supabase
+        .from('profiles')
+        .select('id, gamertag, total_runs, highest_score')
+        .not('channel3_id', 'is', null);
+      
+      // Exclude current user if provided
+      if (excludeUserId) {
+        query = query.neq('id', excludeUserId);
+      }
+      
+      query = query.order('created_at', { ascending: false });
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error("Error fetching C3 players:", error);
+        return null;
+      }
+      
+      if (!data || data.length === 0) {
+        console.warn("No C3 players found");
+        return null;
+      }
+      
+      // Return a random C3 player
+      return data[Math.floor(Math.random() * data.length)];
+    } catch (err) {
+      console.error("Exception fetching C3 player:", err);
+      return null;
+    }
   };
 
   const checkProfile = async (userId) => {
@@ -473,33 +516,95 @@ function App() {
           summary.push(`${effect.health > 0 ? '+' : ''}${effect.health} HP`);
       }
 
+      // Gems
+      if (effect.gems) {
+          setResources(prev => {
+              const currentGems = prev.inventory.gems?.count || 0;
+              const currentGemsAvg = prev.inventory.gems?.avg || 0;
+              const appliedGemDelta = effect.gems > 0
+                  ? effect.gems
+                  : -Math.min(currentGems, Math.abs(effect.gems));
+              const newGemCount = currentGems + appliedGemDelta;
+              const totalInvBefore = Object.values(prev.inventory).reduce((a, b) => a + b.count, 0);
+              const totalInvAfter = totalInvBefore - currentGems + newGemCount;
+              
+              // If gems won't fit, increase max inventory
+              if (appliedGemDelta > 0 && totalInvAfter > maxInventory) {
+                  const overflow = totalInvAfter - maxInventory;
+                  setMaxInventory(m => m + overflow + 10);
+              }
+              
+              const newAvg = appliedGemDelta > 0
+                  ? ((currentGems * currentGemsAvg) / newGemCount) || 0
+                  : (newGemCount > 0 ? currentGemsAvg : 0);
+              
+              return { 
+                  ...prev, 
+                  inventory: { ...prev.inventory, gems: { count: newGemCount, avg: newAvg } }
+              };
+          });
+          summary.push(`${effect.gems > 0 ? '+' : ''}${effect.gems} Gems`);
+      }
+
+      // Max Inventory Expansion
+      if (effect.max_inventory) {
+          setMaxInventory(prev => prev + effect.max_inventory);
+          summary.push(`+${effect.max_inventory} Inventory Space`);
+      }
+
       // Items
       if (effect.add_item) {
           const item = effect.add_item;
-          const count = effect.amount || 1;
+          const rawCount = Number(effect.amount ?? 1);
           setResources(prev => {
               const currentInv = prev.inventory;
+              const currentItem = currentInv[item] || { count: 0, avg: 0 };
               const totalItems = Object.values(currentInv).reduce((a, b) => a + b.count, 0);
-              if (totalItems + count <= maxInventory) {
-                  return {
-                      ...prev,
-                      inventory: {
-                          ...currentInv,
-                          [item]: { ...currentInv[item], count: currentInv[item].count + count }
-                      }
-                  };
+              const appliedCount = rawCount > 0
+                  ? rawCount
+                  : -Math.min(currentItem.count, Math.abs(rawCount));
+              const newCount = currentItem.count + appliedCount;
+
+              if (appliedCount > 0 && totalItems + appliedCount > maxInventory) {
+                  setMaxInventory(m => m + (totalItems + appliedCount - maxInventory));
               }
-              return prev;
+
+              const newAvg = appliedCount > 0
+                  ? ((currentItem.count * currentItem.avg) / newCount) || 0
+                  : (newCount > 0 ? currentItem.avg : 0);
+
+              return {
+                  ...prev,
+                  inventory: {
+                      ...currentInv,
+                      [item]: { ...currentItem, count: newCount, avg: newAvg }
+                  }
+              };
           });
-          summary.push(`+${count} ${item}`);
+          summary.push(`${rawCount > 0 ? '+' : ''}${rawCount} ${item}`);
       }
 
       if (effect.remove_all_item) {
-          setResources(prev => ({
-              ...prev,
-              inventory: { ...prev.inventory, [effect.remove_all_item]: { count: 0, avg: 0 } }
-          }));
-          summary.push(`Lost all ${effect.remove_all_item}`);
+          setResources(prev => {
+              const currentInv = prev.inventory;
+              const item = effect.remove_all_item;
+              const count = currentInv[item]?.count || 0;
+              let newMoney = prev.money;
+              // If player doesn't have the item, deduct gold
+              if (count === 0) {
+                  // Use current location price
+                  const price = currentPrices[item] || 0;
+                  newMoney -= price;
+                  summary.push(`Lost ${price}g for missing ${item}`);
+              } else {
+                  summary.push(`Lost all ${item}`);
+              }
+              return {
+                  ...prev,
+                  money: newMoney,
+                  inventory: { ...currentInv, [item]: { count: 0, avg: 0 } }
+              };
+          });
       }
 
       // Special
@@ -553,6 +658,9 @@ function App() {
     setEventMsg(null);
     setIsRolling(false);
     setRollTarget(null);
+    setC3EncountersUsed(0);
+    setC3EncountersRemoved(false);
+    setC3Player(null);
 
     // 2. Handle Randomization
     let selectedRace = buildSelection.race; 
@@ -604,10 +712,10 @@ function App() {
     
     logGameSession(status, cause || (isDead ? 'Unknown' : 'Time Limit'));
     setGameState('gameover');
-    if (status !== 'Dead') saveScore();
+        if (status !== 'Dead') saveScore();
   };
 
-  const triggerRandomEvent = (locObj) => {
+  const triggerRandomEvent = async (locObj) => {
     setEventMsg(null); 
     setHealth(h => {
         const threshold = Math.floor(maxHealth * 0.25);
@@ -638,6 +746,19 @@ function App() {
         if (conf.req_debt && debt <= 0) return false;
         if (conf.req_min_day && day < conf.req_min_day) return false;
         if (conf.req_max_day && day > conf.req_max_day) return false;
+        
+        // C3 encounter filtering: day-based net worth thresholds
+        if (conf.c3_encounter) {
+            if (c3EncountersUsed >= 3) return false; // Already used 3 C3 encounters
+            if (day < 15) {
+                // Before day 15: need 1 million gold
+                if (netWorth < 1000000) return false;
+            } else {
+                // After day 15: need 10k gold
+                if (netWorth < 10000) return false;
+            }
+        }
+        
         return true;
     });
 
@@ -655,13 +776,19 @@ function App() {
 
     const event = weightedPool[Math.floor(Math.random() * weightedPool.length)];
 
-    // 3. UNIFIED EVENT SETUP (Combat + Check)
-    if (event.type === 'combat' || event.type === 'check') {
+    // 3. UNIFIED EVENT SETUP (Combat + Check + C3 Check)
+    if (event.type === 'combat' || event.type === 'check' || event.type === 'c3_check') {
         let config = event.config;
         
         // Handle Scaling
         if (event.slug === 'guards' && netWorth > 1000000) {
              config = { ...config, difficulty: 16 }; 
+        }
+
+        // For C3 checks, fetch a random C3 player (exclude current user)
+        if (event.type === 'c3_check' || event.config?.c3_encounter) {
+            const randomC3Player = await getRandomC3Player(userProfile?.id);
+            setC3Player(randomC3Player);
         }
 
         setActiveEvent({
@@ -672,7 +799,89 @@ function App() {
         return recalcPrices(locObj);
     }
 
-        // 4. SIMPLE EVENTS
+    // 4. SIMPLE EVENTS (including C3 Flavor Encounters)
+    
+    // Handle C3 Encounters
+    if (event.type === 'c3_encounter' || (event.config?.c3_encounter && event.type !== 'c3_check')) {
+        const randomC3Player = await getRandomC3Player(userProfile?.id); // Exclude current user
+        setC3Player(randomC3Player);
+        
+        // Personalize the text with the C3 player's name if available
+        let msg = event.text;
+        if (randomC3Player && randomC3Player.gamertag) {
+            const capitalizeFirstLetter = (str) => str.charAt(0).toUpperCase() + str.slice(1);
+            const displayName = capitalizeFirstLetter(randomC3Player.gamertag);
+            msg = msg.replace('{c3_player_name}', displayName)
+                     .replace('{player_name}', displayName);
+        }
+        
+        // Helper: Randomize value by ±20%
+        const randomizeValue = (base) => {
+            const variation = base * 0.20;
+            const randomOffset = (Math.random() - 0.5) * 2 * variation; // ±20%
+            return Math.floor(base + randomOffset);
+        };
+        
+        // Apply rewards based on category
+        const category = event.config?.category || 'gold';
+        let msgType = 'good';
+        
+        switch(category) {
+            case 'gold': {
+                const goldReward = randomizeValue(50000);
+                updateMoney(goldReward);
+                msg += ` (+${goldReward.toLocaleString()} Gold)`;
+                break;
+            }
+            case 'gems': {
+                const gemReward = randomizeValue(15);
+                setResources(prev => {
+                    const currentGems = prev.inventory.gems?.count || 0;
+                    const currentGemsAvg = prev.inventory.gems?.avg || 0;
+                    const newGemCount = currentGems + gemReward;
+                    const totalInvBefore = Object.values(prev.inventory).reduce((a, b) => a + b.count, 0);
+                    const totalInvAfter = totalInvBefore - currentGems + newGemCount;
+                    
+                    // If gems won't fit, increase max inventory
+                    if (totalInvAfter > maxInventory) {
+                        const overflow = totalInvAfter - maxInventory;
+                        setMaxInventory(m => m + overflow + 10);
+                    }
+                    
+                    // Calculate weighted average price (free gems have avg of 0)
+                    const newAvg = (currentGems * currentGemsAvg + gemReward * 0) / newGemCount || 0;
+                    
+                    return { 
+                        ...prev, 
+                        inventory: { ...prev.inventory, gems: { count: newGemCount, avg: newAvg } }
+                    };
+                });
+                msg += ` (+${gemReward} Gems)`;
+                break;
+            }
+            case 'health': {
+                setHealth(h => Math.min(h + 25, maxHealth));
+                msg += ` (+25 HP)`;
+                break;
+            }
+            case 'inventory': {
+                const inventoryBonus = randomizeValue(25);
+                setMaxInventory(prev => prev + inventoryBonus);
+                msg += ` (+${inventoryBonus} Inventory Space)`;
+                break;
+            }
+        }
+        
+        // Track C3 encounter usage (limit is 2 per run)
+        setC3EncountersUsed(prev => prev + 1);
+        
+        triggerFlash('green');
+        setEventMsg({ text: msg, type: msgType });
+        setLog(prev => [msg, ...prev]);
+        return recalcPrices(locObj);
+    }
+    
+    // 4. SIMPLE EVENTS
     let msg = event.text;
     let eventPriceMod = 1.0;
     
@@ -726,6 +935,41 @@ function App() {
       setTimeout(() => { finishEvent(rollTarget); setIsRolling(false); setRollTarget(null); }, 800);
   };
 
+  const calculateBonusBreakdown = (event) => {
+    if (!event || event.type !== 'combat') return { total: 0, breakdown: [] };
+    const config = event.config;
+    
+    let breakdown = [];
+    let total = 0;
+
+    if (config.stat === 'combat') {
+      // Weapon/Upgrade Bonus
+      if (combatBonus > 0) {
+        breakdown.push({ label: 'Weapon/Upgrade', value: combatBonus });
+        total += combatBonus;
+      }
+
+      // Race Bonus
+      const raceBonus = player.race.stats.combat || 0;
+      if (raceBonus > 0) {
+        breakdown.push({ label: `${player.race.name} Heritage`, value: raceBonus });
+        total += raceBonus;
+      }
+
+      // Racial Enemy Bonus
+      if (player.race.id === 'kobold' && event.slug === 'dragon') {
+        breakdown.push({ label: 'Dragon Slayer (Kobold)', value: 5 });
+        total += 5;
+      }
+      if (player.race.id === 'halfling' && event.slug === 'guards') {
+        breakdown.push({ label: 'Guard Evasion (Halfling)', value: 5 });
+        total += 5;
+      }
+    }
+
+    return { total, breakdown };
+  };
+
   const finishEvent = (d20) => {
         if (!activeEvent) return;
         const config = activeEvent.config;
@@ -774,6 +1018,15 @@ function App() {
                 total: total
             }
         }));
+  };
+
+  const resolveWalkAwayC3 = () => {
+      // Player walks away from C3 Check encounter - no effects, just close modal
+      setC3EncountersUsed(prev => prev + 1); // Still counts as encounter used
+      setC3Player(null);
+      setActiveEvent(null);
+      const logText = `[C3 CHECK] Wisely declined to help.`;
+      setLog(prev => [logText, ...prev]);
   };
 
   const closeEventModal = () => setActiveEvent(null);
@@ -897,7 +1150,7 @@ const sellAll = (item) => {
     setResources(prev => {
         if (prev.money <= 0 || debt <= 0) return prev;
         const amount = Math.min(prev.money, debt);
-        setDebt(d => d - amount);
+        setDebt(d => Math.max(0, d - amount)); // Ensure debt never goes negative
         setLog(logPrev => [`Paid ${amount}g to the Vault.`, ...logPrev]);
         return { ...prev, money: prev.money - amount };
     });
@@ -960,7 +1213,7 @@ const sellAll = (item) => {
       {gameState === 'playing' && <GameScreen 
           gamertag={userProfile?.gamertag || 'Wanderer'} 
           userProfile={userProfile} // <-- ADD THIS LINE
-          player={player} day={day} maxDays={MAX_DAYS} location={currentLocation} resources={resources} health={health} maxHealth={maxHealth} debt={debt} 
+          player={player} day={day} maxDays={MAX_DAYS} location={currentLocation} resources={resources} health={health} maxHealth={maxHealth} maxInventory={maxInventory} debt={debt} 
           currentPrices={currentPrices} log={log} eventMsg={eventMsg} flash={flash} 
           activeEvent={activeEvent} // UNIFIED EVENT
           isRolling={isRolling} rollTarget={rollTarget}
@@ -973,11 +1226,12 @@ const sellAll = (item) => {
           onSell={sellItem}
           onSellAll={sellAll}
           onBuyUpgrade={buyUpgrade} 
-          combatActions={{ onRollComplete: handleRollComplete, onRun: resolveRunAway, bonus: combatBonus + (player.race.stats.combat || 0) }}
+          combatActions={{ onRollComplete: handleRollComplete, onRun: resolveRunAway, onWalkAway: resolveWalkAwayC3, bonus: combatBonus + (player.race.stats.combat || 0), bonusBreakdown: calculateBonusBreakdown(activeEvent) }}
           onWork={doOddJob} hasTraded={hasTraded}
           // UNIFIED HANDLERS
           onRoll={startRoll}
           onClose={closeEventModal}
+          c3_player={c3Player}
           debugGamertag={DEBUG_GAMERTAG}
       />}
     </>

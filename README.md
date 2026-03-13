@@ -4,12 +4,25 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 
 
 
+## Recent Update
+
+### v1.1.6 - 2026-03-12
+
+- **Channel 3 event expansion:** added about 40 new `c3_check` and `c3_encounter` events to the event table, with matching runtime handlers.
+- **Channel 3 event pass:** c3 check events were rewritten for a more consistent voice, with sharper fail and crit fail outcomes.
+- **New monster encounters:** added 13 D&D-inspired monster events, including goblins, trolls, basilisks, vampires, hydras, liches, necromancers, and a beholder.
+- **Event effect normalization:** item rewards and losses were standardized around the generic `add_item` + `amount` format for easier balancing and maintenance.
+- **Runtime fixes:** negative item outcomes now clamp safely, and game-over score saving was corrected.
+- **Event tooling:** the Event Manager now supports `max_inventory`, and the Event Viewer now supports better search, filtering, sorting, and active/inactive auditing.
+
+
 ## Features
 
 - **Character Creation:** Select your race (Human, Dwarf, Elf, Orc, Kobold, Halfling) and class (Merchant, Rogue, Warrior, Bard, Monk, Wizard), each with unique bonuses and starting stats.
 - **Trading System:** Buy and sell a variety of items (rations, ale, potions, tools, scrolls, gems) at fluctuating prices across different locations.
 - **Dynamic Locations:** Travel between unique locations (Royal City, Goblin Slums, Elven Forest, Iron Forge, Orc Badlands), each with their own price modifiers and risk levels.
 - **Random Events:** Encounter random events including dragon attacks, encounters with city watch, goblin pickpockets, merchant blessings, found treasure, market crashes, and price surges that affect your health, gold, or prices.
+- **Expanded Event Pool:** Channel 3 checks and new monster encounters add more high-variance narrative events with explicit fail, success, crit fail, and crit success outcomes.
 - **Inventory & Upgrades:** Manage your inventory space and purchase upgrades including Pack Mule/Merchant Wagon (inventory expansion), Leather Jerkin/Chain Mail/Plate Armor (damage reduction), and class/race-specific weapons to increase carrying capacity, boost combat skills, or reduce damage taken. Consumables like the Elixir of Life restore 75% of your health.
 - **Smart Trade Validation:** The system intelligently tracks actual trades, only counting successful transactions toward your daily trading count. Failed purchases due to insufficient funds or inventory space don't incorrectly mark the day as "traded."
 - **Combat System:** Engage in dice-roll based combat encounters using the ScrambleDie mechanic. Purchase weapons (Dagger, Steel Sword, Mithril Axe) to increase your combat bonus and defeat enemies. Critical Successes (Nat 20s) deliver devastating blows with flavor text, while Critical Failures (Nat 1s) result in dramatic negative outcomes such as burnt inventory, maiming, or dragon fire.
@@ -89,6 +102,12 @@ The travel mechanic triggers random events that affect gameplay:
 - Ability checks that test your character's chosen stat (combat, wisdom, etc.)
 - Roll a D20 and add your bonus vs a difficulty check (DC)
 - Critical Successes (Nat 20) and Critical Failures (Nat 1) with dramatic outcomes
+- Channel 3 check events now use more consistent narrative voice and clearer success, fail, crit success, and crit fail result text
+
+### Monster Encounters
+- A new set of D&D-inspired encounters expands the event database with monsters such as goblins, trolls, basilisks, vampires, hydras, liches, necromancers, and beholders
+- Each monster encounter is configured with explicit fail, success, crit fail, and crit success branches for easier balancing and clearer tuning
+- Rewards and penalties use the same normalized event-effect structure as the rest of the database-backed event system
 
 ### Unified Event Modal
 - **Single Component for All Checks**: EventModal handles both combat and skill check events with dynamic theming
@@ -295,10 +314,20 @@ The Event Manager is a powerful development tool for creating, editing, and test
   - Risk weighting for random event pool selection
   - Requirements (net worth, debt status, day constraints)
   - Outcome configurations for success/failure/crit scenarios
-  - Effect definitions (gold, health, items, inventory changes)
+  - Effect definitions (gold, health, items, inventory changes, and max inventory adjustments)
 - **JSON Editor:** View and edit raw event JSON with real-time validation
 - **Supabase Integration:** All events persist to the database and are immediately available in-game
 - **Live Testing:** Create events and test them immediately in the next game session
+
+### Event Viewer
+
+The Event Viewer is a read-only audit tool for inspecting the live Supabase event catalog.
+
+**Features:**
+- Search by slug or event text
+- Filter by event type, activation state, and constraint patterns such as c3, debt-gated, or day-gated events
+- Sort by slug, type, activation status, or difficulty
+- Review formatted outcomes and constraints without digging through raw JSON
 
 **Access:** 
 - Run `npm run dev` to start in development mode
