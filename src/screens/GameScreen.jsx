@@ -199,7 +199,9 @@ export default function GameScreen({
                 combatActions={{
                     onRollComplete: combatActions.onRollComplete,
                     onRun: combatActions.onRun,
-                    bonus: combatActions.bonus
+                    onWalkAway: combatActions.onWalkAway,
+                    bonus: combatActions.bonus,
+                    bonusBreakdown: combatActions.bonusBreakdown
                 }}
             />
         </div>

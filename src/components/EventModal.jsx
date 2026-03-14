@@ -6,7 +6,7 @@ export default function EventModal({ event, isRolling, rollTarget, onRoll, onClo
 
     // 1. DETERMINE SKIN
     const isCombat = event.type === 'combat';
-    const isC3Event = event.config?.c3_encounter;
+    const isC3Event = event.type === 'c3_check' || event.config?.c3_encounter;
     
     const theme = {
         color: isC3Event ? 'purple' : (isCombat ? 'red' : 'blue'),
