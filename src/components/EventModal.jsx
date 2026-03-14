@@ -31,6 +31,11 @@ export default function EventModal({ event, isRolling, rollTarget, onRoll, onClo
     // 2. RENDER RESULT STATE
     if (event.result) {
         const success = theme.isSuccess(event.result.outcome);
+        const rollBonus = Number.isFinite(event.result.bonus)
+            ? event.result.bonus
+            : (Number.isFinite(event.result.total) && Number.isFinite(event.result.roll)
+                ? event.result.total - event.result.roll
+                : 0);
 
         return (
             <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
@@ -55,7 +60,7 @@ export default function EventModal({ event, isRolling, rollTarget, onRoll, onClo
                     
                     {/* ROLL DETAILS */}
                     <div className="text-xs text-slate-500 font-mono mb-6">
-                        Rolled {event.result.roll} + Bonus = {event.result.total}
+                        Rolled {event.result.roll} + Bonus {rollBonus} = {event.result.total}
                     </div>
 
                     <div className="space-y-4 mb-8">
@@ -115,8 +120,8 @@ export default function EventModal({ event, isRolling, rollTarget, onRoll, onClo
                     )}
                 </div>
 
-                {/* BONUS BREAKDOWN - CHECKS */}
-                {!isC3Event && combatActions.bonusBreakdown?.breakdown && combatActions.bonusBreakdown.breakdown.length > 0 && (
+                {/* BONUS BREAKDOWN */}
+                {combatActions.bonusBreakdown?.breakdown && combatActions.bonusBreakdown.breakdown.length > 0 && (
                     <div className="mb-4 p-3 rounded-lg bg-slate-800 border border-slate-700">
                         <div className="text-xs font-bold text-slate-300 mb-2">BONUS BREAKDOWN</div>
                         <div className="space-y-1">

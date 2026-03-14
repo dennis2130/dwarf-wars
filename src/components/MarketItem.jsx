@@ -1,5 +1,3 @@
-import { useLongPress } from '../hooks/useLongPress';
-
 export default function MarketItem({ item, buyPrice, sellPrice, myAvg, haveStock, onBuy, onSell, onBuyMax, onSellAll, icon }) {
     
     // Profit Calculation for Sell Price Color
@@ -8,9 +6,6 @@ export default function MarketItem({ item, buyPrice, sellPrice, myAvg, haveStock
         if (sellPrice > myAvg) sellColor = "text-green-400"; 
         else if (sellPrice < myAvg) sellColor = "text-red-400"; 
     }
-
-    const buyEvents = useLongPress(onBuy);
-    const sellEvents = useLongPress(onSell);
 
     return (
         <div className="flex items-center justify-between px-4 py-1 border-b border-slate-700/50 h-16 last:border-0 bg-slate-900/50">
@@ -55,7 +50,7 @@ export default function MarketItem({ item, buyPrice, sellPrice, myAvg, haveStock
                         MAX
                     </button>
                     <button 
-                        {...buyEvents}
+                        onClick={onBuy}
                         className="bg-slate-800 hover:bg-slate-700 text-green-500 border border-slate-600 border-l-0 h-9 w-10 flex items-center justify-center rounded-r text-[10px] font-bold uppercase active:scale-95 transition-all"
                     >
                         BUY
@@ -65,7 +60,7 @@ export default function MarketItem({ item, buyPrice, sellPrice, myAvg, haveStock
                 {/* SELL GROUP */}
                 <div className="flex shadow-sm">
                     <button 
-                        {...sellEvents}
+                        onClick={onSell}
                         className="bg-slate-800 hover:bg-slate-700 text-red-500 border border-slate-600 border-r-0 h-9 w-10 flex items-center justify-center rounded-l text-[10px] font-bold uppercase active:scale-95 transition-all"
                     >
                         SELL

@@ -10,17 +10,15 @@ export const GAME_META = {
         date: "2026-03-12",
         status: "current",
         notes: [
-          "Added about 40 new Channel 3 c3_check and c3_encounter events to the Supabase event table",
-          "Extended runtime handlers so the new C3 event configs and outcomes resolve correctly in game flow",
           "Channel 3 check events received a full voice pass for stronger flavor and more consistent tone",
           "Failure and critical failure outcomes for C3 checks were reworked so bad rolls feel materially punishing",
-          "Added 13 new D&D-style monster encounters including goblins, trolls, hydras, vampires, liches, necromancers, and a beholder",
-          "Monster encounter rewards and item effects were standardized to the generic add_item + amount format",
-          "Negative item outcomes now resolve safely in runtime, preventing broken inventory behavior on loss effects",
-          "Deprecated remove_all_item outcomes were removed from live event configs instead of being supported going forward",
-          "Event Manager now supports max_inventory effects for event authoring",
-          "Event Viewer was upgraded into a better audit tool with active state badges, search, filters, and sorting",
-          "Fixed triggerGameOver to save scores correctly again",
+          "Added 13 new monster encounters: goblins, trolls, hydras, vampires, liches, necromancers, and a beholder",
+          "Roll modifier breakdown now appears on all event modals so you can always see what contributed to your roll",
+          "Roll result now shows explicit math: Rolled X + Bonus Y = Z",
+          "Profile screen now includes a tabbed Personal Build Breakdown (Race / Class / Combinations) with win rate, avg score, best, worst, and bankrupt rate",
+          "Lifetime Service run count now excludes restarts and resets",
+          "Channel 3 leaderboard now only shows players with a linked Channel 3 account",
+          "Long-press hold-to-repeat temporarily disabled on market Buy and Sell buttons",
         ],
       },
       {
@@ -126,32 +124,104 @@ export const RACES = [
     { 
       id: 'human', name: 'Human', desc: 'Versatile.',
       bonus: 'Inventory +20',
-      stats: { inventory: 20, health: 10, buyMod: 0, sellMod: 0, combat: 1 } 
+      stats: {
+        inventory: 20,
+        health: 10,
+        buyMod: 0,
+        sellMod: 0,
+        combat: 1,
+        wisdom: 0,
+        intelligence: 0,
+        charisma: 0,
+        dexterity: 0,
+        constitution: 0,
+        stealth: 0
+      }
     },
     { 
       id: 'dwarf', name: 'Dwarf', desc: 'Greedy Negotiator.',
       bonus: 'Sell for +10% more',
-      stats: { inventory: 0, health: 40, buyMod: 0, sellMod: 0.10, combat: 0 } 
+      stats: {
+        inventory: 0,
+        health: 40,
+        buyMod: 0,
+        sellMod: 0.10,
+        combat: 0,
+        wisdom: 0,
+        intelligence: 0,
+        charisma: 0,
+        dexterity: 0,
+        constitution: 0,
+        stealth: 0
+      }
     },
     { 
       id: 'elf', name: 'Elf', desc: 'Charismatic.',
       bonus: 'Buy for 15% less',
-      stats: { inventory: 5, health: -10, buyMod: 0.15, sellMod: 0, combat: 0 } 
+      stats: {
+        inventory: 5,
+        health: -10,
+        buyMod: 0.15,
+        sellMod: 0,
+        combat: 0,
+        wisdom: 0,
+        intelligence: 0,
+        charisma: 0,
+        dexterity: 0,
+        constitution: 0,
+        stealth: 0
+      }
     },
     { 
       id: 'orc', name: 'Orc', desc: 'Intimidating.',
       bonus: 'Huge Inventory & Strong',
-      stats: { inventory: 40, health: 20, buyMod: -0.05, sellMod: -0.05, combat: 2 } 
+      stats: {
+        inventory: 40,
+        health: 20,
+        buyMod: -0.05,
+        sellMod: -0.05,
+        combat: 2,
+        wisdom: 0,
+        intelligence: 0,
+        charisma: 0,
+        dexterity: 0,
+        constitution: 0,
+        stealth: 0
+      }
     },
         { 
       id: 'kobold', name: 'Kobold', desc: 'Dragon Servant.',
       bonus: 'Combat +5 vs Dragons, Horde Tactics',
-      stats: { inventory: 30, health: -20, buyMod: 0, sellMod: 0, combat: 0 } 
+      stats: {
+        inventory: 30,
+        health: -20,
+        buyMod: 0,
+        sellMod: 0,
+        combat: 0,
+        wisdom: 0,
+        intelligence: 0,
+        charisma: 0,
+        dexterity: 0,
+        constitution: 0,
+        stealth: 0
+      }
     },
     { 
       id: 'halfling', name: 'Halfling', desc: 'Slippery.',
       bonus: 'Combat +5 vs Guards',
-      stats: { inventory: 5, health: -15, buyMod: 0.05, sellMod: 0.05, combat: 0 } 
+      stats: {
+        inventory: 5,
+        health: -15,
+        buyMod: 0.05,
+        sellMod: 0.05,
+        combat: 0,
+        wisdom: 0,
+        intelligence: 0,
+        charisma: 0,
+        dexterity: 0,
+        constitution: 0,
+        stealth: 0
+      }
     }
 ];
   
@@ -159,32 +229,86 @@ export const CLASSES = [
     { 
       id: 'bard', name: 'Bard', desc: 'Charismatic.',
       startingMoney: 600, 
-      startingDebt: 2000 
+      startingDebt: 2000,
+      stats: {
+        combat: 0,
+        wisdom: 0,
+        intelligence: 0,
+        charisma: 0,
+        dexterity: 0,
+        constitution: 0,
+        stealth: 0
+      }
     },
     { 
       id: 'merchant', name: 'Merchant', desc: 'Born to trade.',
       startingMoney: 2000, 
-      startingDebt: 10000
+      startingDebt: 10000,
+      stats: {
+        combat: 0,
+        wisdom: 0,
+        intelligence: 0,
+        charisma: 0,
+        dexterity: 0,
+        constitution: 0,
+        stealth: 0
+      }
     },
     { 
       id: 'monk', name: 'Monk', desc: 'Self-sufficient.',
       startingMoney: 0, 
-      startingDebt: 0
+      startingDebt: 0,
+      stats: {
+        combat: 0,
+        wisdom: 0,
+        intelligence: 0,
+        charisma: 0,
+        dexterity: 0,
+        constitution: 0,
+        stealth: 0
+      }
     },
     { 
       id: 'rogue', name: 'Rogue', desc: 'Hidden in Shadows.',
       startingMoney: 300, 
-      startingDebt: 3000
+      startingDebt: 3000,
+      stats: {
+        combat: 0,
+        wisdom: 0,
+        intelligence: 0,
+        charisma: 0,
+        dexterity: 0,
+        constitution: 0,
+        stealth: 0
+      }
     },
     { 
       id: 'warrior', name: 'Warrior', desc: 'Fighter.',
       startingMoney: 600, 
-      startingDebt: 6000
+      startingDebt: 6000,
+      stats: {
+        combat: 0,
+        wisdom: 0,
+        intelligence: 0,
+        charisma: 0,
+        dexterity: 0,
+        constitution: 0,
+        stealth: 0
+      }
     }, 
     { 
       id: 'wizard', name: 'Wizard', desc: 'Arcane Power.',
       startingMoney: 1000, 
-      startingDebt: 6000
+      startingDebt: 6000,
+      stats: {
+        combat: 0,
+        wisdom: 0,
+        intelligence: 0,
+        charisma: 0,
+        dexterity: 0,
+        constitution: 0,
+        stealth: 0
+      }
     }
 ];
 

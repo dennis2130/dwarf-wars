@@ -290,8 +290,42 @@ function App() {
   };
 
   const fetchLeaderboard = async () => {
-    const { data } = await supabase.from('high_scores').select('*').order('final_score', { ascending: false }).limit(500);
-    if (data) setLeaderboard(data);
+        const { data, error } = await supabase
+            .from('high_scores')
+            .select('*')
+            .order('final_score', { ascending: false })
+            .limit(500);
+
+        if (error) {
+            console.error('Error loading leaderboard:', error);
+            return;
+        }
+
+        if (!data) return;
+
+        // On live Channel 3 hosts, show only scores from linked Channel 3 profiles.
+        if (isChannel3) {
+            const { data: c3Profiles, error: c3Error } = await supabase
+                .from('profiles')
+                .select('gamertag')
+                .not('channel3_id', 'is', null);
+
+            if (c3Error) {
+                console.error('Error loading C3 profile tags for leaderboard filter:', c3Error);
+                setLeaderboard(data);
+                return;
+            }
+
+            const c3Gamertags = new Set((c3Profiles || [])
+                .map((p) => String(p.gamertag || '').toLowerCase())
+                .filter(Boolean));
+
+            const c3OnlyScores = data.filter((row) => c3Gamertags.has(String(row.gamertag || '').toLowerCase()));
+            setLeaderboard(c3OnlyScores);
+            return;
+        }
+
+        setLeaderboard(data);
   };
   
   const fetchProfile = async () => {
@@ -305,16 +339,91 @@ function App() {
         .eq('id', targetId) // Use the ID we know is correct
         .maybeSingle();
 
-    const { data: history } = await supabase
-        .from('game_logs')
-        // We removed email, so we fetch by gamertag now
-        .select('*')
-        .eq('gamertag', profile?.gamertag) 
-        .order('created_at', { ascending: false })
-        .limit(10);
+    let history = [];
+    let historySource = 'game_logs';
 
+    if (profile?.gamertag) {
+        const gamerTag = String(profile.gamertag).trim();
 
-    if (profile && history) {
+        const [{ data: gamertagLogs, error: gamertagErr }, { data: charNameLogs, error: charNameErr }] = await Promise.all([
+            supabase
+                .from('game_logs')
+                .select('*')
+                .eq('gamertag', gamerTag)
+                .order('created_at', { ascending: false })
+                .limit(1000),
+            supabase
+                .from('game_logs')
+                .select('*')
+                .eq('char_name', gamerTag)
+                .order('created_at', { ascending: false })
+                .limit(1000)
+        ]);
+
+        if (gamertagErr || charNameErr) {
+            console.warn('Profile game_logs query warning:', gamertagErr || charNameErr);
+        }
+
+        const merged = [...(gamertagLogs || []), ...(charNameLogs || [])];
+        const deduped = [];
+        const seen = new Set();
+
+        merged.forEach((row) => {
+            const key = row.id || `${row.created_at}:${row.gamertag || ''}:${row.char_name || ''}:${row.score || 0}`;
+            if (seen.has(key)) return;
+            seen.add(key);
+            deduped.push(row);
+        });
+
+        deduped.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        history = deduped;
+
+        // Fallback: if game_logs are empty or inaccessible, use high_scores for profile-level history views.
+        if (history.length === 0) {
+            const [{ data: hsGamertag, error: hsGamertagErr }, { data: hsPlayerName, error: hsPlayerNameErr }] = await Promise.all([
+                supabase
+                    .from('high_scores')
+                    .select('*')
+                    .eq('gamertag', gamerTag)
+                    .order('created_at', { ascending: false })
+                    .limit(1000),
+                supabase
+                    .from('high_scores')
+                    .select('*')
+                    .eq('player_name', gamerTag)
+                    .order('created_at', { ascending: false })
+                    .limit(1000)
+            ]);
+
+            if (hsGamertagErr || hsPlayerNameErr) {
+                console.warn('Profile high_scores fallback warning:', hsGamertagErr || hsPlayerNameErr);
+            }
+
+            const scoreMerged = [...(hsGamertag || []), ...(hsPlayerName || [])];
+            const scoreSeen = new Set();
+            history = scoreMerged
+                .filter((row) => {
+                    const key = row.id || `${row.created_at}:${row.gamertag || ''}:${row.player_name || ''}:${row.final_score || 0}`;
+                    if (scoreSeen.has(key)) return false;
+                    scoreSeen.add(key);
+                    return true;
+                })
+                .map((row) => ({
+                    race: row.race,
+                    class: row.class,
+                    score: Number(row.final_score || 0),
+                    status: Number(row.final_score || 0) >= 0 ? 'Win' : 'Bankrupt',
+                    created_at: row.created_at,
+                    gamertag: row.gamertag || row.player_name
+                }))
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            historySource = 'high_scores';
+        }
+    }
+
+    if (profile) {
+        const recentHistory = history.slice(0, 10);
         setProfileData({ 
             stats: {
                 totalRuns: profile.total_runs,
@@ -323,7 +432,9 @@ function App() {
                 dragonsKilled: profile.dragons_killed,
                 totalGold: profile.total_gold
             }, 
-            history 
+            history: recentHistory,
+                        fullHistory: history,
+                        historySource
         });
         setGameState('profile');
     }
@@ -935,54 +1046,75 @@ function App() {
       setTimeout(() => { finishEvent(rollTarget); setIsRolling(false); setRollTarget(null); }, 800);
   };
 
-  const calculateBonusBreakdown = (event) => {
-    if (!event || event.type !== 'combat') return { total: 0, breakdown: [] };
-    const config = event.config;
-    
-    let breakdown = [];
-    let total = 0;
+    const normalizeStatName = (statName) => {
+        if (!statName) return 'combat';
+        const key = String(statName).toLowerCase();
+        const aliases = {
+            wis: 'wisdom',
+            int: 'intelligence',
+            cha: 'charisma',
+            dex: 'dexterity',
+            con: 'constitution',
+            str: 'combat'
+        };
+        return aliases[key] || key;
+    };
 
-    if (config.stat === 'combat') {
-      // Weapon/Upgrade Bonus
-      if (combatBonus > 0) {
-        breakdown.push({ label: 'Weapon/Upgrade', value: combatBonus });
-        total += combatBonus;
-      }
+    const getStatModifier = (source, statName) => {
+        if (!source || !statName) return 0;
+        const value = source.stats?.[statName];
+        return Number.isFinite(value) ? value : 0;
+    };
 
-      // Race Bonus
-      const raceBonus = player.race.stats.combat || 0;
-      if (raceBonus > 0) {
-        breakdown.push({ label: `${player.race.name} Heritage`, value: raceBonus });
-        total += raceBonus;
-      }
+    const formatStatLabel = (statName) => {
+        if (!statName) return 'Check';
+        return statName.charAt(0).toUpperCase() + statName.slice(1);
+    };
 
-      // Racial Enemy Bonus
-      if (player.race.id === 'kobold' && event.slug === 'dragon') {
-        breakdown.push({ label: 'Dragon Slayer (Kobold)', value: 5 });
-        total += 5;
-      }
-      if (player.race.id === 'halfling' && event.slug === 'guards') {
-        breakdown.push({ label: 'Guard Evasion (Halfling)', value: 5 });
-        total += 5;
-      }
-    }
+    const getEventRollBonusBreakdown = (event) => {
+        if (!event || !event.config?.stat) return { total: 0, breakdown: [] };
 
-    return { total, breakdown };
-  };
+        const stat = normalizeStatName(event.config.stat);
+        const breakdown = [];
+        let total = 0;
+
+        const raceStatBonus = getStatModifier(player.race, stat);
+        if (raceStatBonus !== 0) {
+            breakdown.push({ label: `${player.race.name} ${formatStatLabel(stat)}`, value: raceStatBonus });
+            total += raceStatBonus;
+        }
+
+        const classStatBonus = getStatModifier(player.class, stat);
+        if (classStatBonus !== 0) {
+            breakdown.push({ label: `${player.class.name} ${formatStatLabel(stat)}`, value: classStatBonus });
+            total += classStatBonus;
+        }
+
+        // Combat-specific sources are additive with general race/class stat bonuses.
+        if (stat === 'combat') {
+            if (combatBonus > 0) {
+                breakdown.push({ label: 'Weapon/Upgrade', value: combatBonus });
+                total += combatBonus;
+            }
+
+            if (player.race.id === 'kobold' && event.slug === 'dragon') {
+                breakdown.push({ label: 'Dragon Slayer (Kobold)', value: 5 });
+                total += 5;
+            }
+
+            if (player.race.id === 'halfling' && event.slug === 'guards') {
+                breakdown.push({ label: 'Guard Evasion (Halfling)', value: 5 });
+                total += 5;
+            }
+        }
+
+        return { total, breakdown };
+    };
 
   const finishEvent = (d20) => {
         if (!activeEvent) return;
         const config = activeEvent.config;
-        
-        let bonus = 0;
-        // Combat Bonus
-        if (config.stat === 'combat') {
-            bonus = combatBonus + (player.race.stats.combat || 0);
-            
-            // Racial Bonuses (Hardcoded for now, could be in DB later)
-            if (player.race.id === 'kobold' && activeEvent.slug === 'dragon') bonus += 5;
-            if (player.race.id === 'halfling' && activeEvent.slug === 'guards') bonus += 5;
-        }
+        const bonus = getEventRollBonusBreakdown(activeEvent).total;
         
         const total = d20 + bonus;
 
@@ -1004,7 +1136,8 @@ function App() {
             }
         }
 
-        const logText = `[${config.stat.toUpperCase()}] Rolled ${d20} + ${bonus} vs DC ${config.difficulty}. ${outcomeKey.toUpperCase()}!`;
+        const statName = normalizeStatName(config.stat).toUpperCase();
+        const logText = `[${statName}] Rolled ${d20} + ${bonus} vs DC ${config.difficulty}. ${outcomeKey.toUpperCase()}!`;
         setLog(prev => [logText, ...prev]);
         triggerFlash(outcomeKey.includes('success') ? 'gold' : 'red');
 
@@ -1015,6 +1148,7 @@ function App() {
                 text: outcomeData.text,
                 effectText: effectText,
                 roll: d20,
+                bonus,
                 total: total
             }
         }));
@@ -1174,6 +1308,8 @@ const sellAll = (item) => {
     triggerRandomEvent(nextLoc);
   };
 
+    const activeEventBonus = getEventRollBonusBreakdown(activeEvent);
+
   return (
     <>
   <div onClick={() => setSplash(false)} className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900 transition-opacity duration-1000 ${splash ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
@@ -1226,7 +1362,7 @@ const sellAll = (item) => {
           onSell={sellItem}
           onSellAll={sellAll}
           onBuyUpgrade={buyUpgrade} 
-          combatActions={{ onRollComplete: handleRollComplete, onRun: resolveRunAway, onWalkAway: resolveWalkAwayC3, bonus: combatBonus + (player.race.stats.combat || 0), bonusBreakdown: calculateBonusBreakdown(activeEvent) }}
+          combatActions={{ onRollComplete: handleRollComplete, onRun: resolveRunAway, onWalkAway: resolveWalkAwayC3, bonus: activeEventBonus.total, bonusBreakdown: activeEventBonus }}
           onWork={doOddJob} hasTraded={hasTraded}
           // UNIFIED HANDLERS
           onRoll={startRoll}

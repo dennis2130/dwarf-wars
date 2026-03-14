@@ -24,6 +24,7 @@ const TYPE_META = {
 };
 
 const C3_CATEGORIES = ["gold", "gems", "health", "inventory"];
+const CHECK_STATS = ["combat", "wisdom", "intelligence", "charisma", "dexterity", "constitution", "stealth"];
 
 const ITEMS = ["rations", "ale", "potions", "tools", "scrolls", "gems"];
 
@@ -303,10 +304,9 @@ function ConfigBuilder({ type, cfg, onChange }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <MiniField label="Stat Used">
             <select value={cfg.stat ?? "charisma"} onChange={(e) => set("stat", e.target.value)} style={inputStyle}>
-              <option value="combat">combat</option>
-              <option value="wisdom">wisdom</option>
-              <option value="charisma">charisma</option>
-              <option value="stealth">stealth</option>
+              {CHECK_STATS.map((stat) => (
+                <option key={stat} value={stat}>{stat}</option>
+              ))}
             </select>
           </MiniField>
           <MiniField label={`Difficulty (DC): ${cfg.difficulty ?? 12}`}>
@@ -387,10 +387,9 @@ function ConfigBuilder({ type, cfg, onChange }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <MiniField label="Stat Used">
             <select value={cfg.stat ?? "combat"} onChange={(e) => set("stat", e.target.value)} style={inputStyle}>
-              <option value="combat">combat</option>
-              <option value="wisdom">wisdom</option>
-              <option value="charisma">charisma</option>
-              <option value="stealth">stealth</option>
+              {CHECK_STATS.map((stat) => (
+                <option key={stat} value={stat}>{stat}</option>
+              ))}
             </select>
           </MiniField>
           <MiniField label={`Difficulty (DC): ${cfg.difficulty ?? 12}`}>

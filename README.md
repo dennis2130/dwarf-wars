@@ -14,6 +14,14 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 - **Event effect normalization:** item rewards and losses were standardized around the generic `add_item` + `amount` format for easier balancing and maintenance.
 - **Runtime fixes:** negative item outcomes now clamp safely, and game-over score saving was corrected.
 - **Event tooling:** the Event Manager now supports `max_inventory`, and the Event Viewer now supports better search, filtering, sorting, and active/inactive auditing.
+- **Expanded stat infrastructure:** all races and classes now carry placeholder values for all seven roll stats — `combat`, `wisdom`, `intelligence`, `charisma`, `dexterity`, `constitution`, and `stealth`. All placeholders are currently `0`, so there is no gameplay impact yet, but the foundation is in place to assign per-race and per-class bonuses to any check type in a future balance pass.
+- **Unified roll modifier display:** the roll modifier breakdown panel now appears on every event modal type — combat, skill check, and C3 events alike — so players can always see exactly which bonuses contributed to their total. The result line was updated to show the full roll math: *Rolled 9 + Bonus 8 = 17*.
+- **All-stat roll resolution:** the roll bonus engine (`getEventRollBonusBreakdown`) now reads the correct race and class stat modifier for any of the seven stats, not just combat. Shorthand aliases (`wis`, `dex`, `cha`, etc.) are normalized automatically.
+- **Event Manager stat coverage:** the Event Manager tool now exposes all seven stats in its check-type dropdowns so new events can be wired to any attribute.
+- **Personal Build Breakdown on Profile:** the Profile screen now includes a tabbed Build Breakdown section showing performance split by **Race**, **Class**, and **Combinations**. Each row shows run count, average score, and win rate (green). An expandable sub-row shows best score, worst score, and bankrupt rate. Reset and restart runs are excluded from all calculations.
+- **Lifetime Service run count corrected:** the Runs counter in the Lifetime Service section now excludes `Quit (Restart)` and `Reset` sessions so the number reflects genuine completed attempts.
+- **Channel 3 leaderboard filtering:** when playing on a Channel 3 host, the leaderboard only shows scores from profiles that have a linked `channel3_id`, keeping dev and test accounts off the public rankings.
+- **Long-press disabled on market Buy/Sell:** the hold-to-repeat behaviour on Buy and Sell buttons has been temporarily disabled; single-click purchasing remains fully functional.
 
 
 ## Features
@@ -116,6 +124,9 @@ The travel mechanic triggers random events that affect gameplay:
 - **Sophisticated Roll System**: Uses cryptographic randomization for fair D20 rolls with real-time dice animation
 - **Outcome-Based Effects**: Dynamic text and game state changes based on success/failure with visual feedback
 - **Racial & Class Bonuses**: Combat and check bonuses factored in automatically (e.g., Kobolds get +5 vs Dragons, Halflings get +5 vs Guards)
+- **Transparent Modifier Breakdown**: Every modal — combat, skill check, and C3 encounter — displays the full list of bonuses that contributed to the roll, so players always know where their bonus came from
+- **Explicit Roll Math**: The result line shows the complete calculation: *Rolled X + Bonus Y = Z*, making successes and failures easy to reason about
+- **All-Stat Check Support**: The roll engine resolves modifiers for all seven character stats (`combat`, `wisdom`, `intelligence`, `charisma`, `dexterity`, `constitution`, `stealth`), enabling events that challenge any attribute
 
 ### Positive Events
 - **Cleric's Blessing (Johann)** - Restores 25 health to the player
@@ -149,6 +160,7 @@ The travel mechanic triggers random events that affect gameplay:
 	  - Bard: 600 Gold, 2000 Debt (Charismatic)
 	  - Monk: 0 Gold, 0 Debt (Self-sufficient)
 	  - Wizard: 1000 Gold, 6000 Debt (Arcane Power)
+	- **Full Stat Infrastructure:** Every race and class now carries values for all seven roll stats — `combat`, `wisdom`, `intelligence`, `charisma`, `dexterity`, `constitution`, and `stealth`. Currently all new stats are `0` (no gameplay effect), but the system is ready for per-build bonuses to any check type in a future balance pass.
 
 2. **Trade & Survive:**
 	- Buy low, sell high! Prices change with each location and event.
@@ -188,9 +200,12 @@ The travel mechanic triggers random events that affect gameplay:
   - **Work Mode (No Trades Today):** If you haven't bought or sold items during the current day, clicking "Work & Travel" keeps you in the current location. You earn 50-200 gold from odd jobs and may encounter random events. This is useful for healing up or making quick gold.
   - **Travel Mode (After Trading):** Once you've made any buy or sell transaction, the button changes to "Travel to New Location." You'll move to a random new city, earn no wages, and encounter random events. Debt interest (5%) is applied immediately on each action (whether Work or Travel), and the day counter increments.
   - **Final Day:** On day 31, the button becomes "Time to End Your Adventure" in golden yellow, triggering the game-over sequence immediately.
-- **Combat & Skill Checks:** When triggered, a unified modal appears for both combat encounters and skill checks.
+- **Combat & Skill Checks:** When triggered, a unified modal appears for combat encounters, skill checks, and Channel 3 events.
   - Roll a D20 die using cryptographic randomization with your character's bonus applied.
+  - A modifier breakdown panel lists every bonus contributing to your roll (race, class, upgrades, situational bonuses).
+  - The result line shows the full equation: *Rolled X + Bonus Y = Z*.
   - For combat: Combat stats + racial bonuses (Kobolds +5 vs Dragons, Halflings +5 vs Guards).
+  - For skill checks: The relevant stat (wisdom, charisma, stealth, etc.) is used automatically based on the event configuration.
   - Success/Failure determined by comparing roll total against difficulty check (DC).
   - Critical Successes (Nat 20) and Critical Failures (Nat 1) with dramatic outcomes and special effects.
   - For combat only: "Run Away" button to flee with a 10 HP penalty. The ScrambleDie animates the outcome.
@@ -202,12 +217,16 @@ The travel mechanic triggers random events that affect gameplay:
   - **Month:** Top scores from the past 30 days
   - **All Time:** Top scores since the game launched
 - **My Profile:** (If logged in) View your lifetime statistics including:
-  - **Total Runs:** Number of games you've started
+  - **Total Runs:** Number of completed attempts (excludes restarts and reset sessions)
   - **Lifetime Profit:** Total gold earned across all games minus total debt paid
   - **Personal Best:** Your highest single-game score
   - **Deaths:** Total number of times you've lost a game
   - **Dragon Heads:** Total dragons defeated across all runs
-  - **Recent Game History:** Last 10-15 games with scores, race/class, and outcomes
+  - **Personal Build Breakdown:** Tabbed performance breakdown showing how your runs have gone split by Race, Class, and Race/Class Combination. Each row shows:
+    - Run count, average score, and win rate
+    - Sub-row with best score, worst score, and bankrupt rate
+    - Reset and restart runs are excluded so stats reflect genuine play
+  - **Recent Game History:** Last 10-15 games with scores, race/class, and outcomes (displayed below the build breakdown)
 - **Exit/Restart:** Use the in-game option to exit your current run and start over.
 - **Help/Guide:** Click the Help button to view the in-game guide explaining races, classes, controls, and advanced mechanics like Bleed and Guard encounters.
 
@@ -234,15 +253,15 @@ The project is organized with a clear separation of concerns:
 - **`src/screens/`** - Main screen components for different game states:
   - `StartScreen.jsx` - Race/class selection, dynamic leaderboard with time filters, and login interface
   - `GameScreen.jsx` - Main gameplay loop with market/inventory tabs, travel mechanics, combat encounters, and event handling
-  - `ProfileScreen.jsx` - User profile with lifetime statistics, game history, and gamer tag management
+  - `ProfileScreen.jsx` - User profile with lifetime statistics, personal build breakdown (Race/Class/Combinations tabs with win rate and avg score), game history, and gamer tag management
   - `GameOverScreen.jsx` - End-of-game summary with score calculation and database logging
   - `HelpScreen.jsx` - In-game guide explaining races, classes, controls, survival mechanics, and strategies
   - `GamerTagModal.jsx` - Modal for setting/editing player gamer tags with profanity validation
 - **`src/components/`** - Reusable React components:
   - `StatsBar.jsx` - Displays player health, gold, inventory capacity, active location, day counter, and combat stats
   - `InventoryGrid.jsx` - Visual inventory management with item icons, count displays, and dynamic full-inventory warning
-  - `MarketItem.jsx` - Enhanced tradeable item display with long-press buy/sell support, MAX/ALL buttons for bulk transactions, profit color coding (green for profit, red for loss), and improved compact layout
-  - `EventModal.jsx` - Unified event handler for combat and skill checks with animated D20 dice rolls, outcome-based effects, and dynamic theming (red for combat, blue for checks)
+  - `MarketItem.jsx` - Tradeable item display with MAX/ALL buttons for bulk transactions, profit color coding (green for profit, red for loss), and compact layout. Single-click buy/sell is active; long-press hold-to-repeat is currently disabled.
+  - `EventModal.jsx` - Unified event handler for combat, skill checks, and C3 events with animated D20 dice rolls, outcome-based effects, and dynamic theming (red for combat, blue for checks). Displays a full modifier breakdown for every event type and shows explicit roll math (Rolled X + Bonus Y = Z)
   - `ScrambleDie.jsx` - Animated D20 dice roll component with combat result visualization
 - **`src/hooks/`** - Custom React hooks:
   - `useLongPress.js` - Handles long-press interactions for continuous buy/sell actions with global event listeners to properly detect finger/mouse lift anywhere on screen
