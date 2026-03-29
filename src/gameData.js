@@ -14,14 +14,19 @@ export const GAME_META = {
           "Elixir items can now provide targeted stat bonuses (Combat, Inventory) with individual effects",
           "Fixed C3 encounter name placeholders showing raw c3_player_name values instead of formatted text",
           "Fixed multiple encounter text areas showing '+-' instead of '-' for negative values",
-          "Build Summary modal shows all active race/class/equipment/elixir modifiers at a glance",
-          "Click player name in top-left to open Build Summary with full modifier breakdown",
-          "Buy Mod and Sell Mod now display real gem prices from current market, showing actual impact of modifiers",
+          "Character Sheet modal shows all active race/class/equipment/elixir modifiers at a glance",
+          "Click player name in top-left to open Character Sheet with full modifier breakdown",
+          "Fixed Buy Mod and Sell Mod display showing inverted signs (now correctly shows +5% as +5%)",
+          "Fixed Character Sheet Buy/Sell Mod display to show base price → adjusted price, clarifying modifier benefit",
+          "Market prices now correctly apply all Buy/Sell Mods (race + class + elixir) for accurate trading costs",
+          "Alchemist shop items now display thematic icons: beakers for liquids, sparkles for dusts/powders",
+          "Wizard class gains 3% discount on all Alchemist shop items",
+          "Wizard discount displays in Character Sheet legend and Help screen for easy reference",
           "Defense system now tracks all armor items and reduces incoming damage for better survivability",
-          "Display of new attributes: Intelligence, Charisma, Constitution, Stealth, and Sell Mod for better build optimization",
+          "Display of attributes: Intelligence, Charisma, Constitution, Stealth, Wisdom, Dexterity, and full Sell Mod details",
           "Modal displays Buy/Sell modifier impact on gem prices with green/red coding for favorable/unfavorable trades",
           "Fixed C3 check encounter filtering to properly enforce 3-per-run limit",
-          "Build Summary modal optimized for both mobile and desktop with compact, responsive design",
+          "Character Sheet optimized for both mobile and desktop with compact, responsive design",
           "All modifier cards show single-line breakdown with comma-separated sources for quick scanning",
         ],
       },
@@ -248,7 +253,7 @@ export const RACES = [
 export const CLASSES = [
     { 
       id: 'bard', name: 'Bard', desc: 'Charismatic.',
-      startingMoney: 600, 
+      startingMoney: 1100, 
       startingDebt: 2000,
       stats: {
         combat: 0,
@@ -257,7 +262,9 @@ export const CLASSES = [
         charisma: 3,
         dexterity: 0,
         constitution: 0,
-        stealth: 0
+        stealth: 0,
+        buyMod: 0,
+        sellMod: 0
       }
     },
     { 
@@ -271,7 +278,9 @@ export const CLASSES = [
         charisma: 0,
         dexterity: 0,
         constitution: 0,
-        stealth: 0
+        stealth: 0,
+        buyMod: 0.05,
+        sellMod: 0.05
       }
     },
     { 
@@ -285,12 +294,14 @@ export const CLASSES = [
         charisma: 0,
         dexterity: 2,
         constitution: 2,
-        stealth: 2
+        stealth: 2,
+        buyMod: 0,
+        sellMod: .10
       }
     },
     { 
       id: 'rogue', name: 'Rogue', desc: 'Hidden in Shadows.',
-      startingMoney: 300, 
+      startingMoney: 900, 
       startingDebt: 3000,
       stats: {
         combat: 0,
@@ -299,13 +310,15 @@ export const CLASSES = [
         charisma: 0,
         dexterity: 3,
         constitution: 0,
-        stealth: 3
+        stealth: 3,
+        buyMod: 0,
+        sellMod: 0
       }
     },
     { 
       id: 'warrior', name: 'Warrior', desc: 'Fighter.',
-      startingMoney: 600, 
-      startingDebt: 6000,
+      startingMoney: 1000, 
+      startingDebt: 5000,
       stats: {
         combat: 3,
         wisdom: 0,
@@ -313,13 +326,15 @@ export const CLASSES = [
         charisma: 0,
         dexterity: 0,
         constitution: 2,
-        stealth: -1
+        stealth: -1,
+        buyMod: .10,
+        sellMod: 0
       }
     }, 
     { 
       id: 'wizard', name: 'Wizard', desc: 'Arcane Power.',
       startingMoney: 1000, 
-      startingDebt: 6000,
+      startingDebt: 8000,
       stats: {
         combat: 0,
         wisdom: 3,
@@ -327,7 +342,9 @@ export const CLASSES = [
         charisma: 0,
         dexterity: 0,
         constitution: 0,
-        stealth: 0
+        stealth: 0,
+        buyMod: 0,
+        sellMod: 0
       }
     }
 ];
@@ -413,7 +430,7 @@ export const UPGRADES = [
     { id: 'merchant_windfall', name: "Merchant's Windfall", type: 'elixir', value: { buyMod: 0.05, sellMod: 0.03 }, cost: 180000, desc: "+5% Buy Discount, +3% Sell Bonus" },
     { id: 'void_dust', name: 'Void-touched Dust', type: 'elixir', value: { stealth: 4, dexterity: 2, intelligence: 1 }, cost: 140000, desc: "+4 Stealth, +2 Dexterity, +1 Intelligence" },
     { id: 'vitality_nectar', name: 'Vitality Nectar', type: 'elixir', value: { health: 5, constitution: 3 }, cost: 130000, desc: "+5 Health, +3 Constitution" },
-    { id: 'pouch_essence', name: 'Bottomless Pouch Essence', type: 'elixir', value: { inventory: 5, combat: 2 }, cost: 140000, desc: "+5 Inventory, +2 Combat" },
+    //{ id: 'pouch_essence', name: 'Bottomless Pouch Essence', type: 'elixir', value: { inventory: 5, combat: 2 }, cost: 140000, desc: "+5 Inventory, +2 Combat" },
     { id: 'feline_grace', name: "Feline's Grace Oil", type: 'elixir', value: { dexterity: 4, charisma: 2, wisdom: 1 }, cost: 140000, desc: "+4 Dexterity, +2 Charisma, +1 Wisdom" },
     { id: 'siren_pearl', name: "Siren's Pearl Powder", type: 'elixir', value: { charisma: 4, wisdom: 2, intelligence: 1 }, cost: 140000, desc: "+4 Charisma, +2 Wisdom, +1 Intelligence" }
 ];

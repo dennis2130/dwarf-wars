@@ -1133,13 +1133,19 @@ function App() {
   };
 
   const buyUpgrade = (upgrade) => {
-    if (resources.money < upgrade.cost) return setLog(prev => ["Too expensive!", ...prev]);
+    // Calculate cost with Wizard discount on alchemist items
+    let finalCost = upgrade.cost;
+    if (upgrade.type === 'elixir' && player.class.id === 'wizard') {
+        finalCost = Math.floor(upgrade.cost * 0.97); // 3% discount
+    }
+
+    if (resources.money < finalCost) return setLog(prev => ["Too expensive!", ...prev]);
     // Handle healing items (Elixir of Life - numeric value means healing percentage)
     if (upgrade.type === 'heal' || (upgrade.type === 'elixir' && typeof upgrade.value === 'number')) {
         if (health >= maxHealth) return setLog(prev => ["You are healthy!", ...prev]);
         const healAmount = Math.floor(maxHealth * upgrade.value);
         setHealth(h => Math.min(h + healAmount, maxHealth));
-        setResources(prev => ({ ...prev, money: prev.money - upgrade.cost }));
+        setResources(prev => ({ ...prev, money: prev.money - finalCost }));
         setElixirPurchases(prev => ({ ...prev, [upgrade.id]: (prev[upgrade.id] || 0) + 1 }));
         triggerFlash('green'); 
         return;
@@ -1180,7 +1186,7 @@ function App() {
 
     setCombatBonus(currentCombatBonus);
     if (upgrade.type === 'defense') setDefense(currentDefense);
-    setResources(prev => ({ ...prev, money: prev.money - upgrade.cost }));
+    setResources(prev => ({ ...prev, money: prev.money - finalCost }));
     setPlayerItems([...newItems, upgrade]);
     setElixirPurchases(prev => ({ ...prev, [upgrade.id]: (prev[upgrade.id] || 0) + 1 }));
     setLog(prev => [`Bought ${upgrade.name}.`, ...prev]);

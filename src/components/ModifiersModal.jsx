@@ -31,6 +31,12 @@ export default function ModifiersModal({ isOpen, onClose, playerRace, playerClas
     const elixirInventory = elixirs.reduce((sum, e) => {
         return sum + (typeof e.value === 'object' && e.value.inventory ? e.value.inventory : 0);
     }, 0);
+    const elixirBuyMod = elixirs.reduce((sum, e) => {
+        return sum + (typeof e.value === 'object' && e.value.buyMod ? e.value.buyMod : 0);
+    }, 0);
+    const elixirSellMod = elixirs.reduce((sum, e) => {
+        return sum + (typeof e.value === 'object' && e.value.sellMod ? e.value.sellMod : 0);
+    }, 0);
 
     // Attribute list with modifiers
     const attributes = [
@@ -44,8 +50,8 @@ export default function ModifiersModal({ isOpen, onClose, playerRace, playerClas
         { name: 'Dexterity', race: playerRace.stats.dexterity || 0, class: playerClass.stats.dexterity || 0, equipment: 0, elixir: 0 },
         { name: 'Constitution', race: playerRace.stats.constitution || 0, class: playerClass.stats.constitution || 0, equipment: 0, elixir: 0 },
         { name: 'Stealth', race: playerRace.stats.stealth || 0, class: playerClass.stats.stealth || 0, equipment: 0, elixir: 0 },
-        { name: 'Buy Mod', race: playerRace.stats.buyMod || 0, class: playerClass.stats.buyMod || 0, equipment: 0, elixir: 0, isPercent: true },
-        { name: 'Sell Mod', race: playerRace.stats.sellMod || 0, class: playerClass.stats.sellMod || 0, equipment: 0, elixir: 0, isPercent: true },
+        { name: 'Buy Mod', race: playerRace.stats.buyMod || 0, class: playerClass.stats.buyMod || 0, equipment: 0, elixir: elixirBuyMod, isPercent: true },
+        { name: 'Sell Mod', race: playerRace.stats.sellMod || 0, class: playerClass.stats.sellMod || 0, equipment: 0, elixir: elixirSellMod, isPercent: true },
     ];
 
     // Filter to only show attributes with at least one non-zero modifier
@@ -56,7 +62,7 @@ export default function ModifiersModal({ isOpen, onClose, playerRace, playerClas
     const formatValue = (value, isPercent = false) => {
         // Handle NaN and non-finite values
         if (!Number.isFinite(value) || value === 0) return '';
-        if (isPercent) return `${value > 0 ? '-' : '+'}${Math.round(Math.abs(value) * 100)}%`;
+        if (isPercent) return `${value > 0 ? '+' : '-'}${Math.round(Math.abs(value) * 100)}%`;
         return `${value > 0 ? '+' : ''}${Math.round(value)}`;
     };
 
@@ -75,7 +81,7 @@ export default function ModifiersModal({ isOpen, onClose, playerRace, playerClas
                 <div className="bg-gradient-to-r from-slate-800 to-slate-700 border-b border-slate-600 p-4 sticky top-0">
                     <div className="flex justify-between items-center">
                         <div>
-                            <h2 className="text-lg font-bold text-slate-100">Build Summary</h2>
+                            <h2 className="text-lg font-bold text-slate-100">Character Sheet</h2>
                             <p className="text-xs text-slate-400 mt-1">{playerRace.name} {playerClass.name}</p>
                         </div>
                         <button onClick={onClose} className="text-slate-400 hover:text-slate-200 transition-colors">
@@ -117,23 +123,26 @@ export default function ModifiersModal({ isOpen, onClose, playerRace, playerClas
                             
                             if (attr.name === 'Buy Mod') {
                                 // total is already in decimal form (e.g., 0.15 for +15% discount, -0.05 for -5% penalty)
-                                // Buy price = basePrice * (1.0 - buyMod)
-                                const buyPrice = Math.ceil(gemsBasePrice * (1.0 - total));
-                                const difference = buyPrice - gemsBasePrice;
+                                // Base buy price (no modifier) = basePrice
+                                // Actual buy price = basePrice * (1.0 - buyMod)
+                                const baseBuyPrice = gemsBasePrice;
+                                const actualBuyPrice = Math.ceil(gemsBasePrice * (1.0 - total));
+                                const difference = actualBuyPrice - baseBuyPrice;
                                 gemPriceData = {
-                                    marketPrice: gemsBasePrice,
-                                    adjustedPrice: buyPrice,
+                                    basePrice: baseBuyPrice,
+                                    adjustedPrice: actualBuyPrice,
                                     difference: difference,
                                     isFavorable: difference < 0 // For buying, lower is better
                                 };
                             } else if (attr.name === 'Sell Mod') {
-                                // Sell price = basePrice * 0.80 * (1.0 + sellMod)
-                                // total is already in decimal form
-                                const sellPrice = Math.floor(gemsBasePrice * 0.80 * (1.0 + total));
-                                const difference = sellPrice - gemsBasePrice;
+                                // Base sell price (no modifier) = basePrice * 0.80
+                                // Actual sell price = basePrice * 0.80 * (1.0 + sellMod)
+                                const baseSellPrice = Math.floor(gemsBasePrice * 0.80);
+                                const actualSellPrice = Math.floor(gemsBasePrice * 0.80 * (1.0 + total));
+                                const difference = actualSellPrice - baseSellPrice;
                                 gemPriceData = {
-                                    marketPrice: gemsBasePrice,
-                                    adjustedPrice: sellPrice,
+                                    basePrice: baseSellPrice,
+                                    adjustedPrice: actualSellPrice,
                                     difference: difference,
                                     isFavorable: difference > 0 // For selling, higher is better
                                 };
@@ -150,12 +159,22 @@ export default function ModifiersModal({ isOpen, onClose, playerRace, playerClas
                                 </div>
                                 <div className="text-xs text-slate-400">
                                     {gemPriceData ? (
-                                        <div className="space-y-0.5">
+                                        <div className="space-y-1">
                                             <div className="text-slate-500">
-                                                Gem Price: {gemPriceData.marketPrice} → {gemPriceData.adjustedPrice}
+                                                Gem Price: {gemPriceData.basePrice} → {gemPriceData.adjustedPrice}
                                             </div>
                                             <div className={gemPriceData.isFavorable ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>
                                                 ({gemPriceData.difference > 0 ? '+' : ''}{gemPriceData.difference})
+                                            </div>
+                                            <div className="text-[10px] text-slate-500 pt-0.5">
+                                                {modifiers.map((mod, i) => (
+                                                    <span key={i}>
+                                                        {i > 0 && ', '}
+                                                        <span className={getCategoryColor(mod.category)}>
+                                                            {mod.text}
+                                                        </span>
+                                                    </span>
+                                                ))}
                                             </div>
                                         </div>
                                     ) : (
@@ -187,6 +206,9 @@ export default function ModifiersModal({ isOpen, onClose, playerRace, playerClas
                         )}
                         {inventoryItems.length > 0 && (
                             <p><span className="text-blue-400 font-bold">Inventory:</span> {inventoryItems.map(i => i.name).join(', ')}</p>
+                        )}
+                        {playerClass.id === 'wizard' && (
+                            <p><span className="text-purple-400 font-bold">Special:</span> 3% discount on Alchemist shop items</p>
                         )}
                         {elixirs.length > 0 && (
                             <p><span className="text-emerald-400 font-bold">Elixirs:</span> {elixirs.map(e => e.name).join(', ')}</p>

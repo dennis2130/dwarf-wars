@@ -1,12 +1,14 @@
 import { BASE_PRICES } from '../gameData';
 
-export const getBuyPrice = (basePrice, playerRace) => {
-    const buyMod = playerRace?.stats?.buyMod || 0;
+export const getBuyPrice = (basePrice, buyModOrRace = 0) => {
+    // Support both old (playerRace object) and new (numeric buyMod) signatures for backwards compatibility
+    const buyMod = typeof buyModOrRace === 'object' ? (buyModOrRace?.stats?.buyMod || 0) : buyModOrRace;
     return Math.ceil(basePrice * (1.0 - buyMod));
 };
 
-export const getSellPrice = (basePrice, playerRace) => {
-    const sellMod = playerRace?.stats?.sellMod || 0;
+export const getSellPrice = (basePrice, sellModOrRace = 0) => {
+    // Support both old (playerRace object) and new (numeric sellMod) signatures for backwards compatibility
+    const sellMod = typeof sellModOrRace === 'object' ? (sellModOrRace?.stats?.sellMod || 0) : sellModOrRace;
     return Math.floor(basePrice * 0.80 * (1.0 + sellMod));
 };
 

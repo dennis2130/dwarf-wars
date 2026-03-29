@@ -41,7 +41,7 @@ export default function HelpScreen({ onClose }) {
                         <li><strong>MAX Button:</strong> Buys as many items as you can afford and carry.</li>
                         <li><strong>ALL Button:</strong> Sells your entire stock of an item instantly.</li>
                         <li><strong>Buy/Sell:</strong> Tap to trade one item, or hold down to trade quickly.</li>
-                        <li><strong>Player Name:</strong> Click your name in the top-left to view your Build Summary and see all active modifiers.</li>
+                        <li><strong>Player Name:</strong> Click your name in the top-left to view your Character Sheet and see all active modifiers.</li>
                     </ul>
                 </section>
 
@@ -87,6 +87,7 @@ export default function HelpScreen({ onClose }) {
                                     </div>
                                 </div>
                                 <div className="text-xs text-slate-500 italic">"{c.desc}"</div>
+                                {c.id === 'wizard' && <div className="text-xs text-purple-400 mt-1"><strong>Special:</strong> 3% discount on Alchemist shop items</div>}
                             </div>
                         ))}
                     </div>

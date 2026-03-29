@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Map, RotateCcw, LogOut, Shield, ShoppingBag, Sword, FlaskConical, Landmark, Star } from 'lucide-react';
+import { Map, RotateCcw, LogOut, Shield, ShoppingBag, Sword, Landmark, Star } from 'lucide-react';
 import StatsBar from '../components/StatsBar';
 import InventoryGrid from '../components/InventoryGrid';
 import MarketItem from '../components/MarketItem';
@@ -7,6 +7,7 @@ import ModifiersModal from '../components/ModifiersModal';
 import { getIcon } from '../utils';
 import { UPGRADES } from '../gameData';
 import EventModal from '../components/EventModal';
+import { getBuyPrice as calcBuyPrice, getSellPrice as calcSellPrice } from '../services/marketService';
 
 export default function GameScreen({ 
     gamertag, player, day, maxDays, location, resources, health, maxHealth, maxInventory, debt, defense,
@@ -95,27 +96,45 @@ export default function GameScreen({
 
             {activeTab === 'market' && (
                 <>
-                    <div className="mb-4 bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
-                        {Object.keys(currentPrices).map((item) => {
-                            const buyPrice = getBuyPrice(currentPrices[item]);
-                            const sellPrice = getSellPrice(currentPrices[item]);
-                            return (
-                                <MarketItem 
-                                    key={item} 
-                                    item={item} 
-                                    icon={getIcon(item)} 
-                                    buyPrice={buyPrice}
-                                    sellPrice={sellPrice}
-                                    myAvg={resources.inventory[item]?.avg || 0} 
-                                    haveStock={resources.inventory[item]?.count > 0} 
-                                    onBuy={() => onBuy(item)} 
-                                    onSell={() => onSell(item)} 
-                                    onBuyMax={() => onBuyMax(item)} 
-                                    onSellAll={() => onSellAll(item)}
-                                />
-                            );
-                        })}
-                    </div>
+                    {/* Calculate total Buy/Sell Mods from all sources */}
+                    {(() => {
+                        // Get elixir mods
+                        const elixirsFromItems = playerItems?.filter(item => item.type === 'elixir') || [];
+                        const elixirBuyMod = elixirsFromItems.reduce((sum, e) => {
+                            return sum + (typeof e.value === 'object' && e.value.buyMod ? e.value.buyMod : 0);
+                        }, 0);
+                        const elixirSellMod = elixirsFromItems.reduce((sum, e) => {
+                            return sum + (typeof e.value === 'object' && e.value.sellMod ? e.value.sellMod : 0);
+                        }, 0);
+
+                        // Calculate total mods: race + class + elixir
+                        const totalBuyMod = (player.race?.stats?.buyMod || 0) + (player.class?.stats?.buyMod || 0) + elixirBuyMod;
+                        const totalSellMod = (player.race?.stats?.sellMod || 0) + (player.class?.stats?.sellMod || 0) + elixirSellMod;
+
+                        return (
+                            <div className="mb-4 bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
+                                {Object.keys(currentPrices).map((item) => {
+                                    const buyPrice = calcBuyPrice(currentPrices[item], totalBuyMod);
+                                    const sellPrice = calcSellPrice(currentPrices[item], totalSellMod);
+                                    return (
+                                        <MarketItem 
+                                            key={item} 
+                                            item={item} 
+                                            icon={getIcon(item)} 
+                                            buyPrice={buyPrice}
+                                            sellPrice={sellPrice}
+                                            myAvg={resources.inventory[item]?.avg || 0} 
+                                            haveStock={resources.inventory[item]?.count > 0} 
+                                            onBuy={() => onBuy(item)} 
+                                            onSell={() => onSell(item)} 
+                                            onBuyMax={() => onBuyMax(item)} 
+                                            onSellAll={() => onSellAll(item)}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        );
+                    })()}
                     <InventoryGrid inventory={resources.inventory} maxInventory={maxInventory} />
                 </>
             )}
@@ -159,13 +178,15 @@ export default function GameScreen({
                 <div className="mb-4 flex-grow space-y-2">
                     {UPGRADES.filter(u => u.type === 'elixir').map((u) => {
                         const owned = playerItems.find(i => i.id === u.id);
+                        // Calculate discounted price for Wizard
+                        const displayPrice = player.class.id === 'wizard' ? Math.floor(u.cost * 0.97) : u.cost;
                         return (
                             <div key={u.id} className={`flex justify-between items-center p-3 rounded border ${owned ? 'bg-slate-800/50 border-slate-700 opacity-50' : 'bg-slate-800 border-slate-600'}`}>
                                 <div className="flex items-center gap-3">
-                                    <FlaskConical size={20} className="text-green-400"/>
+                                    {getIcon(u.id)}
                                     <div><div className="font-bold text-sm text-slate-200">{u.name}</div><div className="text-[10px] text-slate-400">{u.desc}</div></div>
                                 </div>
-                                {owned ? <span className="text-xs text-green-500 font-bold">OWNED</span> : <button onClick={() => onBuyUpgrade(u)} className="bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-1 rounded text-xs font-bold">{u.cost} g</button>}
+                                {owned ? <span className="text-xs text-green-500 font-bold">OWNED</span> : <button onClick={() => onBuyUpgrade(u)} className="bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-1 rounded text-xs font-bold">{displayPrice} g</button>}
                             </div>
                         )
                     })}

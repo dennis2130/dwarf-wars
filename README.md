@@ -6,35 +6,43 @@ Dwarf Wars is a fantasy-themed trading and survival game built with React, Vite,
 
 ## Recent Update
 
+### v1.1.7 - 2026-03-29
+
+**Major Updates:**
+- **Character Sheet Modal:** Click your player name to open a comprehensive Character Sheet displaying all active modifiers from your race, class, equipment, and elixirs in one place. Shows modifier breakdown with consistent color-coding by source.
+- **Buy/Sell Mod Fixes:** Fixed inverted percentage sign display (now correctly shows +5% as +5% instead of -5%). Character Sheet now displays base price → adjusted price to clearly show the economic benefit of your modifiers.
+- **Market Price Accuracy:** Market prices now correctly apply all Buy/Sell Mods from race, class, and equipped elixirs combined, giving you accurate pricing for actual trading costs.
+- **Alchemist Shop Overhaul:** New dedicated Alchemist tab in the marketplace featuring elixir items with targeted stat bonuses (Combat, Inventory, Intelligence, Wisdom, Charisma, Dexterity, Stealth, Constitution, Health, Defense, plus Buy/Sell Mod effects).
+- **Thematic Icon System:** Alchemist items now display thematic icons—beakers for liquid potions and sparkles for dust/powder items—making it easy to visually distinguish item types at a glance.
+- **Wizard Class Discount:** Wizards now receive a 3% discount on all Alchemist shop items. Discount is displayed in the Character Sheet legend and Help screen for easy reference.
+- **Enhanced Mod Display:** Buy/Sell Mod cards now show real gem prices from the current market with explicit base → adjusted calculation, revealing the exact gold benefit of your modifiers.
+- **C3 Encounter Fixes:** Fixed encounter text display (no more '+-' prefixes) and fixed encounter name placeholders to show actual player names instead of raw c3_player_name values.
+- **Full Stat Infrastructure:** All races and classes now carry bonuses for all seven roll stats — `combat`, `wisdom`, `intelligence`, `charisma`, `dexterity`, `constitution`, and `stealth`.
+
+**New Elixir Items (Alchemist Shop):**
+- **Dragonscale Draught:** +5 Combat, +2 Defense - 150,000g (Liquid - Beaker)
+- **Philosopher's Stone Dust:** +4 Intelligence, +2 Wisdom, +1 Charisma - 140,000g (Powder - Sparkles)
+- **Merchant's Windfall:** +5% Buy Discount, +3% Sell Bonus - 180,000g (Powder - Sparkles)
+- **Void-touched Dust:** +4 Stealth, +2 Dexterity, +1 Intelligence - 140,000g (Powder - Sparkles)
+- **Vitality Nectar:** +5 Health, +3 Constitution - 130,000g (Liquid - Beaker)
+- **Feline's Grace Oil:** +4 Dexterity, +2 Charisma, +1 Wisdom - 140,000g (Liquid - Beaker)
+- **Siren's Pearl Powder:** +4 Charisma, +2 Wisdom, +1 Intelligence - 140,000g (Powder - Sparkles)
+
+
 ### v1.1.6 - 2026-03-12
 
-- **Channel 3 event expansion:** added about 40 new `c3_check` and `c3_encounter` events to the event table, with matching runtime handlers.
-- **Channel 3 event pass:** c3 check events were rewritten for a more consistent voice, with sharper fail and crit fail outcomes.
-- **New monster encounters:** added 13 D&D-inspired monster events, including goblins, trolls, basilisks, vampires, hydras, liches, necromancers, and a beholder.
-- **Event effect normalization:** item rewards and losses were standardized around the generic `add_item` + `amount` format for easier balancing and maintenance.
-- **Runtime fixes:** negative item outcomes now clamp safely, and game-over score saving was corrected.
-- **Event tooling:** the Event Manager now supports `max_inventory`, and the Event Viewer now supports better search, filtering, sorting, and active/inactive auditing.
-- **Expanded stat infrastructure:** all races and classes now carry placeholder values for all seven roll stats — `combat`, `wisdom`, `intelligence`, `charisma`, `dexterity`, `constitution`, and `stealth`. All placeholders are currently `0`, so there is no gameplay impact yet, but the foundation is in place to assign per-race and per-class bonuses to any check type in a future balance pass.
-- **Unified roll modifier display:** the roll modifier breakdown panel now appears on every event modal type — combat, skill check, and C3 events alike — so players can always see exactly which bonuses contributed to their total. The result line was updated to show the full roll math: *Rolled 9 + Bonus 8 = 17*.
-- **All-stat roll resolution:** the roll bonus engine (`getEventRollBonusBreakdown`) now reads the correct race and class stat modifier for any of the seven stats, not just combat. Shorthand aliases (`wis`, `dex`, `cha`, etc.) are normalized automatically.
-- **Event Manager stat coverage:** the Event Manager tool now exposes all seven stats in its check-type dropdowns so new events can be wired to any attribute.
-- **Personal Build Breakdown on Profile:** the Profile screen now includes a tabbed Build Breakdown section showing performance split by **Race**, **Class**, and **Combinations**. Each row shows run count, average score, and win rate (green). An expandable sub-row shows best score, worst score, and bankrupt rate. Reset and restart runs are excluded from all calculations.
-- **Lifetime Service run count corrected:** the Runs counter in the Lifetime Service section now excludes `Quit (Restart)` and `Reset` sessions so the number reflects genuine completed attempts.
-- **Channel 3 leaderboard filtering:** when playing on a Channel 3 host, the leaderboard only shows scores from profiles that have a linked `channel3_id`, keeping dev and test accounts off the public rankings.
-- **Long-press disabled on market Buy/Sell:** the hold-to-repeat behaviour on Buy and Sell buttons has been temporarily disabled; single-click purchasing remains fully functional.
-
-
-## Features
-
 - **Character Creation:** Select your race (Human, Dwarf, Elf, Orc, Kobold, Halfling) and class (Merchant, Rogue, Warrior, Bard, Monk, Wizard), each with unique bonuses and starting stats.
-- **Trading System:** Buy and sell a variety of items (rations, ale, potions, tools, scrolls, gems) at fluctuating prices across different locations.
+- **Trading System:** Buy and sell a variety of items (rations, ale, potions, tools, scrolls, gems) at fluctuating prices across different locations with accurate pricing that factors in all your buying/selling modifiers.
+- **Trading Modifiers:** Build and customize your economic bonuses through race, class, and equipped elixir combinations. Buy Mod and Sell Mod effects stack, letting you create builds optimized for buying cheap or selling expensive.
+- **Character Sheet:** Click your player name to view a comprehensive Character Sheet showing all active modifiers from race, class, equipment, and elixirs. Buy/Sell Mod cards show real gem prices with explicit base → adjusted calculations to demonstrate your modifier impact.
+- **Elixir System:** Purchase targeted stat potions from the Alchemist shop with effects ranging from combat bonuses to economic modifiers. Elixirs stack multiplicatively for synergistic builds. Wizards enjoy a 3% discount on all Alchemist items.
 - **Dynamic Locations:** Travel between unique locations (Royal City, Goblin Slums, Elven Forest, Iron Forge, Orc Badlands), each with their own price modifiers and risk levels.
 - **Random Events:** Encounter random events including dragon attacks, encounters with city watch, goblin pickpockets, merchant blessings, found treasure, market crashes, and price surges that affect your health, gold, or prices.
 - **Expanded Event Pool:** Channel 3 checks and new monster encounters add more high-variance narrative events with explicit fail, success, crit fail, and crit success outcomes.
-- **Inventory & Upgrades:** Manage your inventory space and purchase upgrades including Pack Mule/Merchant Wagon (inventory expansion), Leather Jerkin/Chain Mail/Plate Armor (damage reduction), and class/race-specific weapons to increase carrying capacity, boost combat skills, or reduce damage taken. Consumables like the Elixir of Life restore 75% of your health.
+- **Inventory & Upgrades:** Manage your inventory space and purchase upgrades including Pack Mule/Merchant Wagon (inventory expansion), Leather Jerkin/Chain Mail/Plate Armor (damage reduction), and class/race-specific weapons to increase carrying capacity, boost combat skills, or reduce damage taken. Consumables like the Elixir of Life and Jonah's Glass of Milk restore health and provide stat bonuses.
 - **Smart Trade Validation:** The system intelligently tracks actual trades, only counting successful transactions toward your daily trading count. Failed purchases due to insufficient funds or inventory space don't incorrectly mark the day as "traded."
 - **Combat System:** Engage in dice-roll based combat encounters using the ScrambleDie mechanic. Purchase weapons (Dagger, Steel Sword, Mithril Axe) to increase your combat bonus and defeat enemies. Critical Successes (Nat 20s) deliver devastating blows with flavor text, while Critical Failures (Nat 1s) result in dramatic negative outcomes such as burnt inventory, maiming, or dragon fire.
-- **Consumables:** Use special items like the Elixir of Life to restore health during your adventure.
+- **Consumables:** Use special items like the Elixir of Life and Jonah's Glass of Milk to restore health and gain stat bonuses during your adventure.
 - **Health & Survival:** Monitor your health and combat ability. If your health drops to zero, it's game over! Beware the **Bleed** mechanic: when your health drops below 25%, you take damage every time you travel.
 - **Debt Interest:** Your debt compounds at 5% interest daily, so paying it off quickly is crucial to maximizing your final score.
 - **Taxation Mechanic:** If your net worth exceeds 1 million gold, the City Watch will pursue you, triggering guard encounters.
@@ -96,6 +104,24 @@ Players can purchase permanent upgrades during gameplay to enhance inventory, de
 
 ### Consumables
 - **Elixir of Life:** Heals 75% of max health, 10000 gold
+- **Jonah's Glass of Milk:** +2 to Combat Roll, +20 Inventory, 200000 gold
+
+### Alchemist Shop (Elixirs)
+Elixir potions provide targeted stat bonuses and can be stacked to create synergistic builds. Each elixir is a permanent upgrade for your current run.
+
+**Liquid Elixirs (Beaker Icon):**
+- **Dragonscale Draught:** +5 Combat, +2 Defense - 150,000 gold
+- **Vitality Nectar:** +5 Health, +3 Constitution - 130,000 gold
+- **Feline's Grace Oil:** +4 Dexterity, +2 Charisma, +1 Wisdom - 140,000 gold
+
+**Dust & Powder Elixirs (Sparkles Icon):**
+- **Philosopher's Stone Dust:** +4 Intelligence, +2 Wisdom, +1 Charisma - 140,000 gold
+- **Void-touched Dust:** +4 Stealth, +2 Dexterity, +1 Intelligence - 140,000 gold
+- **Siren's Pearl Powder:** +4 Charisma, +2 Wisdom, +1 Intelligence - 140,000 gold
+- **Merchant's Windfall:** +5% Buy Discount, +3% Sell Bonus - 180,000 gold
+
+**Wizard Class Benefit:**
+Wizards receive a 3% discount on all Alchemist shop items, making powerful elixir builds more accessible to spellcasters.
 
 ## Random Events System
 
@@ -130,7 +156,7 @@ The travel mechanic triggers random events that affect gameplay:
 
 ### Positive Events
 - **Cleric's Blessing (Johann)** - Restores 25 health to the player
-- **Found Coin Purse** - Grants 200 gold
+- **Found Coin Purse** - Grants 2000 gold
 
 ### Economy Events
 - **Market Crash** - Prices drop to 50% for the day
@@ -154,12 +180,16 @@ The travel mechanic triggers random events that affect gameplay:
 	  - Kobold: Inventory +30, Health -20, Combat +5 vs Dragons (Dragon Servant)
 	  - Halfling: Inventory +5, Health -15, Combat +5 vs Guards, Buy/Sell +5% (Slippery)
 	- **Classes (6 total):**
-	  - Merchant: 1000 Gold, 10000 Debt (Born to trade) *(Recently rebalanced for improved viability)*
-	  - Rogue: 300 Gold, 3000 Debt (Hidden in Shadows)
-	  - Warrior: 600 Gold, 6000 Debt (Fighter)
+	  - Merchant: 1500 Gold, 10000 Debt (Born to trade) 
+	  - Rogue: 900 Gold, 3000 Debt (Hidden in Shadows)
+	  - Warrior: 1000 Gold, 5000 Debt (Fighter)
 	  - Bard: 600 Gold, 2000 Debt (Charismatic)
 	  - Monk: 0 Gold, 0 Debt (Self-sufficient)
-	  - Wizard: 1000 Gold, 6000 Debt (Arcane Power)
+	  - Wizard: 1000 Gold, 8000 Debt (Arcane Power) — *Special: 3% discount on Alchemist shop items*
+	- **Trading Statistics:** Each class now carries buy/sell modifiers that affect market pricing:
+	  - **Buy Mod:** Affects the price you pay when purchasing items (positive = discount, negative = premium)
+	  - **Sell Mod:** Affects the price you receive when selling items (positive = bonus, negative = penalty)
+	  - These modifiers can be further enhanced by race bonuses and equipped elixirs like Merchant's Windfall
 	- **Full Stat Infrastructure:** Every race and class now carries values for all seven roll stats — `combat`, `wisdom`, `intelligence`, `charisma`, `dexterity`, `constitution`, and `stealth`. Currently all new stats are `0` (no gameplay effect), but the system is ready for per-build bonuses to any check type in a future balance pass.
 
 2. **Trade & Survive:**
@@ -188,14 +218,26 @@ The travel mechanic triggers random events that affect gameplay:
 
 ## Controls
 
+- **Character Sheet:** Click your player name in the top-left header to open your Character Sheet, which displays:
+  - All active modifiers from your race, class, equipment, and equipped elixirs
+  - Buy/Sell Mod cards showing real gem prices from the current market with explicit calculations
+  - Color-coded modifier sources (purple=Race, blue=Class, orange=Equipment, green=Elixir)
+  - Equipment list and active consumable effects
+  - Special class abilities (e.g., Wizard's 3% Alchemist discount)
 - **Market Tab:** Buy and sell items. Long-press the buy/sell buttons to continuously purchase or sell items.
+  - **Market Prices:** Now correctly apply all Buy/Sell Mods from your race, class, and equipped elixirs for accurate trading costs
   - **Buy Button:** Purchase one item per click. Long-press for continuous buying.
   - **Sell Button:** Sell one item per click. Long-press for continuous selling.
   - **MAX Button:** Buy the maximum amount based on your available gold and inventory space.
   - **ALL Button:** Sell all items of a type instantly.
   - **Profit Color Coding:** Sell prices turn green if selling above your average cost, red if below.
   - **Improved UX:** Long-press interactions now have optimized delays for smoother, more responsive button feedback.
-- **Armory & Stables Tab:** Purchase permanent upgrades (inventory, weapons, defense, consumables).
+- **Armory Tab:** Purchase permanent upgrades (inventory, weapons, defense, consumables).
+- **Alchemist Tab:** Purchase elixir potions with targeted stat bonuses. Elixirs are permanent for your current run and stack with each other.
+  - **Liquid Elixirs:** Display beaker icons (differently colored for quick visual identification)
+  - **Dust/Powder Elixirs:** Display sparkles icons for easy visual distinction
+  - **Wizard Discount:** Wizards pay 3% less on all Alchemist items
+  - **Multi-Stat Bonuses:** Most elixirs provide 2-3 different stat boosts, enabling synergistic builds
 - **Work & Travel Mechanics:** The primary action button adapts based on your trading activity:
   - **Work Mode (No Trades Today):** If you haven't bought or sold items during the current day, clicking "Work & Travel" keeps you in the current location. You earn 50-200 gold from odd jobs and may encounter random events. This is useful for healing up or making quick gold.
   - **Travel Mode (After Trading):** Once you've made any buy or sell transaction, the button changes to "Travel to New Location." You'll move to a random new city, earn no wages, and encounter random events. Debt interest (5%) is applied immediately on each action (whether Work or Travel), and the day counter increments.
@@ -228,7 +270,7 @@ The travel mechanic triggers random events that affect gameplay:
     - Reset and restart runs are excluded so stats reflect genuine play
   - **Recent Game History:** Last 10-15 games with scores, race/class, and outcomes (displayed below the build breakdown)
 - **Exit/Restart:** Use the in-game option to exit your current run and start over.
-- **Help/Guide:** Click the Help button to view the in-game guide explaining races, classes, controls, and advanced mechanics like Bleed and Guard encounters.
+- **Help/Guide:** Click the Help button to view the in-game guide explaining races, classes, controls, advanced mechanics like Bleed and Guard encounters, and special class abilities (e.g., Wizard's Alchemist discount).
 
 ## Tech Stack
 
@@ -260,12 +302,17 @@ The project is organized with a clear separation of concerns:
 - **`src/components/`** - Reusable React components:
   - `StatsBar.jsx` - Displays player health, gold, inventory capacity, active location, day counter, and combat stats
   - `InventoryGrid.jsx` - Visual inventory management with item icons, count displays, and dynamic full-inventory warning
+  - `ModifiersModal.jsx` - Character Sheet modal displaying all active modifiers from race, class, equipment, and elixirs with color-coded sources. Shows Buy/Sell Mod gem price impact and special class abilities.
   - `MarketItem.jsx` - Tradeable item display with MAX/ALL buttons for bulk transactions, profit color coding (green for profit, red for loss), and compact layout. Single-click buy/sell is active; long-press hold-to-repeat is currently disabled.
   - `EventModal.jsx` - Unified event handler for combat, skill checks, and C3 events with animated D20 dice rolls, outcome-based effects, and dynamic theming (red for combat, blue for checks). Displays a full modifier breakdown for every event type and shows explicit roll math (Rolled X + Bonus Y = Z)
   - `ScrambleDie.jsx` - Animated D20 dice roll component with combat result visualization
 - **`src/hooks/`** - Custom React hooks:
   - `useLongPress.js` - Handles long-press interactions for continuous buy/sell actions with global event listeners to properly detect finger/mouse lift anywhere on screen
-- **`src/utils.jsx`** - Icon mapping function (`getIcon()`) for all tradeable items and equipment
+- **`src/utils.jsx`** - Icon mapping function (`getIcon()`) for all tradeable items, equipment, and elixirs with thematic icons:
+  - Equipment: weapons, armor, and tools with appropriate icons
+  - Consumables: beakers for liquid elixirs (Dragonscale Draught, Vitality Nectar, Feline's Grace Oil)
+  - Dust/Powder elixirs: sparkles icons for Philosopher's Stone, Void-touched Dust, Siren's Pearl, Merchant's Windfall
+  - Marketplace items: gems, potions, rations, etc.
 - **`src/supabaseClient.js`** - Supabase client initialization with environment variables
 - **`src/tools/`** - Development tools:
   - `event_manager.jsx` - Event management interface for creating, editing, and testing game events with form-based configuration and JSON preview
