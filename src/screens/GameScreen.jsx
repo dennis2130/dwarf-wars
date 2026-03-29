@@ -3,12 +3,13 @@ import { Map, RotateCcw, LogOut, Shield, ShoppingBag, Sword, FlaskConical, Landm
 import StatsBar from '../components/StatsBar';
 import InventoryGrid from '../components/InventoryGrid';
 import MarketItem from '../components/MarketItem';
+import ModifiersModal from '../components/ModifiersModal';
 import { getIcon } from '../utils';
 import { UPGRADES } from '../gameData';
 import EventModal from '../components/EventModal';
 
 export default function GameScreen({ 
-    gamertag, player, day, maxDays, location, resources, health, maxHealth, maxInventory, debt, 
+    gamertag, player, day, maxDays, location, resources, health, maxHealth, maxInventory, debt, defense,
     currentPrices, log, eventMsg, flash, 
     activeEvent, // Unified Event State
     isRolling, rollTarget,
@@ -23,6 +24,7 @@ export default function GameScreen({
     c3_player // C3 Player Context for Encounters
 }) {
     const [activeTab, setActiveTab] = useState('market');
+    const [showModifiersModal, setShowModifiersModal] = useState(false);
 
     // Determine if the current user is a debug user
     const isDebugUser = userProfile?.gamertag === debugGamertag;
@@ -34,7 +36,10 @@ export default function GameScreen({
             <header className="flex justify-between items-start mb-4 border-b border-slate-700 pb-2 relative">
                 
                 {/* LEFT: Player Info */}
-                <div className="z-10 flex items-center gap-2"> {/* <-- MODIFIED: Added flex and gap */}
+                <button 
+                    onClick={() => setShowModifiersModal(true)}
+                    className="z-10 flex items-center gap-2 hover:opacity-80 transition-opacity text-left"
+                > {/* <-- MODIFIED: Added flex and gap */}
                     {userProfile?.c3_profile_image && ( // <-- ADDED AVATAR HERE
                         <img 
                             src={userProfile.c3_profile_image} 
@@ -46,7 +51,7 @@ export default function GameScreen({
                         <h1 className="text-xl font-bold text-yellow-500 truncate max-w-[120px]">{gamertag}</h1>
                         <p className="text-xs text-slate-400 capitalize">{player.race?.name} {player.class?.name}</p>
                     </div>
-                </div>
+                </button>
 
                 {/* CENTER: Day Counter */}
                 <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col items-center">
@@ -84,16 +89,16 @@ export default function GameScreen({
             {/* TABS */}
             <div className="flex border-b border-slate-700 mb-2">
                 <button onClick={() => setActiveTab('market')} className={`flex-1 pb-2 text-xs font-bold ${activeTab === 'market' ? 'text-yellow-500 border-b-2 border-yellow-500' : 'text-slate-500'}`}>MARKETPLACE</button>
-                <button onClick={() => setActiveTab('equipment')} className={`flex-1 pb-2 text-xs font-bold ${activeTab === 'equipment' ? 'text-yellow-500 border-b-2 border-yellow-500' : 'text-slate-500'}`}>UPGRADES</button>
+                <button onClick={() => setActiveTab('equipment')} className={`flex-1 pb-2 text-xs font-bold ${activeTab === 'equipment' ? 'text-yellow-500 border-b-2 border-yellow-500' : 'text-slate-500'}`}>EQUIPMENT</button>
+                <button onClick={() => setActiveTab('elixirs')} className={`flex-1 pb-2 text-xs font-bold ${activeTab === 'elixirs' ? 'text-yellow-500 border-b-2 border-yellow-500' : 'text-slate-500'}`}>ALCHEMIST</button>
             </div>
 
-            {activeTab === 'market' ? (
+            {activeTab === 'market' && (
                 <>
                     <div className="mb-4 bg-slate-800 rounded-lg overflow-hidden border border-slate-700">
                         {Object.keys(currentPrices).map((item) => {
                             const buyPrice = getBuyPrice(currentPrices[item]);
                             const sellPrice = getSellPrice(currentPrices[item]);
-                            
                             return (
                                 <MarketItem 
                                     key={item} 
@@ -113,21 +118,22 @@ export default function GameScreen({
                     </div>
                     <InventoryGrid inventory={resources.inventory} maxInventory={maxInventory} />
                 </>
-            ) : (
+            )}
+            {activeTab === 'equipment' && (
                 <div className="mb-4 flex-grow space-y-2">
-                    {UPGRADES.filter(u => {
-                            if (u.ban) {
-                                if (Array.isArray(u.ban.race)) {
-                                    if (u.ban.race.includes(player.race.id)) return false;
-                                } else if (u.ban.race === player.race.id) {
-                                    return false;
-                                }
-                                if (Array.isArray(u.ban.class)) {
-                                    if (u.ban.class.includes(player.class.id)) return false;
-                                } else if (u.ban.class === player.class.id) {
-                                    return false;
-                                }
+                    {UPGRADES.filter(u => u.type !== 'elixir').filter(u => {
+                        if (u.ban) {
+                            if (Array.isArray(u.ban.race)) {
+                                if (u.ban.race.includes(player.race.id)) return false;
+                            } else if (u.ban.race === player.race.id) {
+                                return false;
                             }
+                            if (Array.isArray(u.ban.class)) {
+                                if (u.ban.class.includes(player.class.id)) return false;
+                            } else if (u.ban.class === player.class.id) {
+                                return false;
+                            }
+                        }
                         if (u.req) {
                             if (u.req.class && u.req.class !== player.class.id) return false;
                             if (u.req.race && u.req.race !== player.race.id) return false;
@@ -141,7 +147,22 @@ export default function GameScreen({
                                     {u.type === 'combat' && <Sword size={20} className="text-red-400"/>}
                                     {u.type === 'defense' && <Shield size={20} className="text-blue-400"/>}
                                     {u.type === 'inventory' && <ShoppingBag size={20} className="text-yellow-400"/>}
-                                    {u.type === 'heal' && <FlaskConical size={20} className="text-green-400"/>}
+                                    <div><div className="font-bold text-sm text-slate-200">{u.name}</div><div className="text-[10px] text-slate-400">{u.desc}</div></div>
+                                </div>
+                                {owned ? <span className="text-xs text-green-500 font-bold">OWNED</span> : <button onClick={() => onBuyUpgrade(u)} className="bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-1 rounded text-xs font-bold">{u.cost} g</button>}
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+            {activeTab === 'elixirs' && (
+                <div className="mb-4 flex-grow space-y-2">
+                    {UPGRADES.filter(u => u.type === 'elixir').map((u) => {
+                        const owned = playerItems.find(i => i.id === u.id);
+                        return (
+                            <div key={u.id} className={`flex justify-between items-center p-3 rounded border ${owned ? 'bg-slate-800/50 border-slate-700 opacity-50' : 'bg-slate-800 border-slate-600'}`}>
+                                <div className="flex items-center gap-3">
+                                    <FlaskConical size={20} className="text-green-400"/>
                                     <div><div className="font-bold text-sm text-slate-200">{u.name}</div><div className="text-[10px] text-slate-400">{u.desc}</div></div>
                                 </div>
                                 {owned ? <span className="text-xs text-green-500 font-bold">OWNED</span> : <button onClick={() => onBuyUpgrade(u)} className="bg-yellow-700 hover:bg-yellow-600 text-white px-3 py-1 rounded text-xs font-bold">{u.cost} g</button>}
@@ -189,11 +210,11 @@ export default function GameScreen({
             <div className={`fixed inset-0 pointer-events-none transition-opacity duration-300 ${flash === 'red' ? 'bg-red-500/30' : flash === 'green' ? 'bg-green-500/30' : flash === 'gold' ? 'bg-yellow-500/30' : 'opacity-0'}`}></div>
 
             {/* UNIFIED EVENT MODAL */}
-            <EventModal 
-                event={activeEvent} 
+            <EventModal
+                event={activeEvent}
                 isRolling={isRolling}
                 rollTarget={rollTarget}
-                onRoll={onRoll} 
+                onRoll={onRoll}
                 onClose={onClose}
                 c3_player={c3_player}
                 combatActions={{
@@ -203,6 +224,18 @@ export default function GameScreen({
                     bonus: combatActions.bonus,
                     bonusBreakdown: combatActions.bonusBreakdown
                 }}
+            />
+
+            {/* MODIFIERS MODAL */}
+            <ModifiersModal 
+                isOpen={showModifiersModal}
+                onClose={() => setShowModifiersModal(false)}
+                playerRace={player.race}
+                playerClass={player.class}
+                playerItems={playerItems}
+                defense={defense}
+                currentLocation={location}
+                currentPrices={currentPrices}
             />
         </div>
     );

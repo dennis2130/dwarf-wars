@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { RACES, CLASSES, LOCATIONS, UPGRADES, BASE_PRICES, GAME_META } from './gameData'
 import { supabase } from './supabaseClient'
+import { getBuyPrice, getSellPrice, recalcPrices as calcMarketPrices, calculateBuyItem, calculateBuyMax, calculateSellItem, calculateSellAll } from './services/marketService'
+import { normalizeStatName, getStatModifier, formatStatLabel, getEventRollBonusBreakdown } from './services/combatService'
+import { generateD20Roll, calculateNetWorth, filterValidEvents, weightEvents, selectRandomEvent, resolveOutcome, personalizeEventText, randomizeEventValue, determineEventMessageType } from './services/eventService'
 
 // Import Screens
 import StartScreen from './screens/StartScreen';
@@ -36,6 +39,7 @@ function App() {
   const [playerItems, setPlayerItems] = useState([]); 
   const [dragonsKilled, setDragonsKilled] = useState(0);
   const [combatStats, setCombatStats] = useState({ wins: 0, losses: 0, flees: 0 });
+  const [elixirPurchases, setElixirPurchases] = useState({});
 
   // Resources
   const [resources, setResources] = useState({ money: 100, inventory: {} });
@@ -43,9 +47,12 @@ function App() {
   const [day, setDay] = useState(1);
   const [currentLocation, setCurrentLocation] = useState(LOCATIONS[0]);
   const [currentPrices, setCurrentPrices] = useState(BASE_PRICES);
+  const [monsterKills, setMonsterKills] = useState({});
   const [log, setLog] = useState([]);
   const [eventMsg, setEventMsg] = useState(null);
   const [flash, setFlash] = useState(''); 
+  const NON_MONSTER_COMBAT_SLUGS = new Set(['guards']);
+  const DRAGON_KILL_SLUGS = new Set(['dragon', 'dragon_wyrmling']);
   const [hasTraded, setHasTraded] = useState(false);
 
   // --- UNIFIED EVENT STATE (Replaces combatEvent/checkEvent) ---
@@ -55,19 +62,16 @@ function App() {
   const [c3EncountersUsed, setC3EncountersUsed] = useState(0);
   const [c3EncountersRemoved, setC3EncountersRemoved] = useState(false);
   const [c3Player, setC3Player] = useState(null);
-
   const DEBUG_GAMERTAG = import.meta.env.VITE_DEBUG_GAMERTAG;
   const isChannel3 = window.location.hostname.includes('channel3.gg');
 
   const MAX_DAYS = 31;
-
   // --- INIT & AUTH ---
   useEffect(() => {
     fetchLeaderboard();
     fetchEvents();
 
     const initSession = async () => {
-        // Check if we are running on Channel 3 (In-Game Browser with C3 API)
         const isChannel3 = window.location.hostname.includes('channel3.gg');
 
         if (isChannel3) {
@@ -76,6 +80,7 @@ function App() {
                 
                 // Fetch User Data from C3 API (Same Origin)
                 const response = await fetch('/api/me');
+    setMonsterKills({});
                 
                 if (response.ok) {
                     const c3Data = await response.json();
@@ -479,7 +484,13 @@ function App() {
         status: status,
         days_survived: day,
         upgrades: playerItems.map(i => i.name),
-        combat_stats: { ...combatStats, dragons_killed: dragonsKilled, cause_of_death: cause }
+        combat_stats: {
+            ...combatStats,
+            dragons_killed: dragonsKilled,
+            monster_kills: monsterKills,
+            elixir_purchases: elixirPurchases,
+            cause_of_death: cause
+        }
     };
 
     try {
@@ -530,7 +541,7 @@ function App() {
                 }
             };
 
-            console.log("Sending data to Channel 3:", channel3Payload);
+            // console.log("Sending data to Channel 3:", channel3Payload);
 
             const c3ApiCallPromise = fetch('https://channel3.gg/api/postgamestats', {
                 method: 'POST',
@@ -566,9 +577,9 @@ function App() {
         // Check Supabase Log Result
         const supabaseLogResult = results[0];
         if (supabaseLogResult && supabaseLogResult.status === 'rejected') {
-            console.error("Supabase Log Insert Error:", supabaseLogResult.reason);
+            //console.error("Supabase Log Insert Error:", supabaseLogResult.reason);
         } else if (supabaseLogResult && supabaseLogResult.status === 'fulfilled') {
-            console.log("Supabase Log Insert Success");
+            //console.log("Supabase Log Insert Success");
         }
 
         // Check Supabase Stats RPC Result (only if it was attempted)
@@ -588,15 +599,12 @@ function App() {
     }
   };
 
-  // --- HELPER: PRICE CALCULATOR ---
-  const getBuyPrice = (basePrice) => {
-      const buyMod = player.race?.stats.buyMod || 0;
-      return Math.ceil(basePrice * (1.0 - buyMod));
-  };
-
-  const getSellPrice = (basePrice) => {
-      const sellMod = player.race?.stats.sellMod || 0;
-      return Math.floor(basePrice * 0.80 * (1.0 + sellMod));
+  // --- MARKET & PRICING ---
+  const handleBuyPrice = (basePrice) => getBuyPrice(basePrice, player.race);
+  const handleSellPrice = (basePrice) => getSellPrice(basePrice, player.race);
+  const handleRecalcPrices = (locObj, randomEventMod = 1.0) => {
+    const newPrices = calcMarketPrices(locObj, randomEventMod);
+    setCurrentPrices(newPrices);
   };
 
   const triggerFlash = (color) => { setFlash(color); setTimeout(() => setFlash(''), 300); };
@@ -606,25 +614,41 @@ function App() {
   const applyOutcomeEffect = (effect) => {
       let summary = [];
 
+      const formatSignedValue = (value, suffix = '') => {
+          const numericValue = Number(value);
+          if (!Number.isFinite(numericValue)) return '';
+          if (numericValue > 0) return `+${numericValue}${suffix}`;
+          if (numericValue < 0) return `-${Math.abs(numericValue)}${suffix}`;
+          return `0${suffix}`;
+      };
+
       // Gold
       if (effect.gold) {
           updateMoney(effect.gold);
-          summary.push(`${effect.gold > 0 ? '+' : ''}${effect.gold}g`);
+          summary.push(formatSignedValue(effect.gold, 'g'));
       }
       if (effect.gold_pct) {
           const delta = Math.floor(resources.money * effect.gold_pct);
           updateMoney(delta);
-          summary.push(`${delta > 0 ? '+' : ''}${delta}g`);
+          summary.push(formatSignedValue(delta, 'g'));
       }
 
       // Health
       if (effect.health) {
           setHealth(h => {
-              const newH = Math.min(h + effect.health, maxHealth);
+              // Apply defense reduction to negative health (damage)
+              const actualDamage = effect.health < 0 ? Math.max(effect.health, -(Math.abs(effect.health) - defense)) : effect.health;
+              const newH = Math.min(h + actualDamage, maxHealth);
               if (newH <= 0) setTimeout(() => triggerGameOver("Event Death"), 500);
               return newH;
           });
-          summary.push(`${effect.health > 0 ? '+' : ''}${effect.health} HP`);
+          if (effect.health < 0) {
+              const damageReduced = Math.min(defense, Math.abs(effect.health));
+              const actualDamage = Math.abs(effect.health) - damageReduced;
+              summary.push(`Took ${actualDamage} Damage${damageReduced > 0 ? ` (${damageReduced} blocked)` : ''}`);
+          } else {
+              summary.push(formatSignedValue(effect.health, ' HP'));
+          }
       }
 
       // Gems
@@ -654,13 +678,13 @@ function App() {
                   inventory: { ...prev.inventory, gems: { count: newGemCount, avg: newAvg } }
               };
           });
-          summary.push(`${effect.gems > 0 ? '+' : ''}${effect.gems} Gems`);
+          summary.push(formatSignedValue(effect.gems, ' Gems'));
       }
 
       // Max Inventory Expansion
       if (effect.max_inventory) {
           setMaxInventory(prev => prev + effect.max_inventory);
-          summary.push(`+${effect.max_inventory} Inventory Space`);
+          summary.push(formatSignedValue(effect.max_inventory, ' Inventory Space'));
       }
 
       // Items
@@ -749,12 +773,16 @@ function App() {
               summary.push(`Forced to pay ${totalOwed}g`);
           } else {
               setHealth(h => {
-                  const newH = h - damage;
+                  const damageReduced = Math.min(defense, damage);
+                  const actualDamage = damage - damageReduced;
+                  const newH = h - actualDamage;
                   if (newH <= 0) setTimeout(() => triggerGameOver("Debt Collection"), 500);
                   return newH;
               });
               triggerFlash('red');
-              summary.push(`Took ${damage} Damage`);
+              const damageReduced = Math.min(defense, damage);
+              const actualDamage = damage - damageReduced;
+              summary.push(`Took ${actualDamage} Damage${damageReduced > 0 ? ` (${damageReduced} blocked)` : ''}`);
           }
       }
 
@@ -794,25 +822,17 @@ function App() {
     setDebt(selectedClass.startingDebt);
     setMaxInventory(inv); setMaxHealth(hp); setHealth(hp); setDefense(def);
     setPlayerItems([]); setCombatBonus(0); setDragonsKilled(0);
+    setMonsterKills({});
+    setElixirPurchases({});
     setCombatStats({ wins: 0, losses: 0, flees: 0 });
     setDay(1);
     setHasTraded(false);
     
     const startLoc = LOCATIONS[0];
     setCurrentLocation(startLoc);
-    recalcPrices(startLoc);
+    handleRecalcPrices(startLoc);
     setLog([`Welcome ${userProfile?.gamertag || 'Wanderer'}...`, "Good luck."]);
     setGameState('playing');
-  };
-
-  const recalcPrices = (locObj, randomEventMod = 1.0) => {
-    let newPrices = { ...BASE_PRICES };
-    for (const item in newPrices) {
-        const volatility = Math.random() * 2.0 + 0.25; 
-        const locMod = locObj.prices[item] || 1.0; 
-        newPrices[item] = Math.floor(BASE_PRICES[item] * volatility * locMod * randomEventMod);
-    }
-    setCurrentPrices(newPrices);
   };
 
   const triggerGameOver = (cause = null) => {
@@ -840,52 +860,18 @@ function App() {
         return h;
     });
 
-    if (Math.random() > locObj.risk) return recalcPrices(locObj);
+    if (Math.random() > locObj.risk) return handleRecalcPrices(locObj);
 
-    // Calculate Net Worth for Filters
-    const inventoryValue = Object.keys(resources.inventory).reduce((total, item) => {
-        const count = resources.inventory[item]?.count || 0;
-        const price = getSellPrice(currentPrices[item] || 0); 
-        return total + (count * price);
-    }, 0);
-    const netWorth = resources.money + inventoryValue;
+    // Calculate Net Worth and filter/select event using service
+    const netWorth = calculateNetWorth(resources, currentPrices, handleSellPrice);
+    const validEvents = filterValidEvents(eventPool, netWorth, day, c3EncountersUsed, debt);
+    
+    if (validEvents.length === 0) return handleRecalcPrices(locObj);
 
-    // 1. FILTERING
-    let validEvents = eventPool.filter(e => {
-        const conf = e.config || {};
-        if (netWorth < (e.req_net_worth || 0)) return false;
-        if (conf.req_debt && debt <= 0) return false;
-        if (conf.req_min_day && day < conf.req_min_day) return false;
-        if (conf.req_max_day && day > conf.req_max_day) return false;
-        
-        // C3 encounter filtering: day-based net worth thresholds
-        if (conf.c3_encounter) {
-            if (c3EncountersUsed >= 3) return false; // Already used 3 C3 encounters
-            if (day < 15) {
-                // Before day 15: need 1 million gold
-                if (netWorth < 1000000) return false;
-            } else {
-                // After day 15: need 10k gold
-                if (netWorth < 10000) return false;
-            }
-        }
-        
-        return true;
-    });
-
-    if (validEvents.length === 0) return recalcPrices(locObj);
-
-    // 2. WEIGHTED SELECTION
-    const weightedPool = [];
-    validEvents.forEach(e => {
-        const weight = e.risk_weight || 1; 
-        for (let i = 0; i < weight; i++) weightedPool.push(e);
-        if (e.slug === 'guards' && netWorth > 1000000) {
-            for(let i=0; i<10; i++) weightedPool.push(e);
-        }
-    });
-
-    const event = weightedPool[Math.floor(Math.random() * weightedPool.length)];
+    const weightedPool = weightEvents(validEvents, netWorth);
+    const event = selectRandomEvent(weightedPool);
+    
+    if (!event) return handleRecalcPrices(locObj);
 
     // 3. UNIFIED EVENT SETUP (Combat + Check + C3 Check)
     if (event.type === 'combat' || event.type === 'check' || event.type === 'c3_check') {
@@ -907,7 +893,7 @@ function App() {
             config: config,
             result: null
         });
-        return recalcPrices(locObj);
+        return handleRecalcPrices(locObj);
     }
 
     // 4. SIMPLE EVENTS (including C3 Flavor Encounters)
@@ -918,20 +904,7 @@ function App() {
         setC3Player(randomC3Player);
         
         // Personalize the text with the C3 player's name if available
-        let msg = event.text;
-        if (randomC3Player && randomC3Player.gamertag) {
-            const capitalizeFirstLetter = (str) => str.charAt(0).toUpperCase() + str.slice(1);
-            const displayName = capitalizeFirstLetter(randomC3Player.gamertag);
-            msg = msg.replace('{c3_player_name}', displayName)
-                     .replace('{player_name}', displayName);
-        }
-        
-        // Helper: Randomize value by ±20%
-        const randomizeValue = (base) => {
-            const variation = base * 0.20;
-            const randomOffset = (Math.random() - 0.5) * 2 * variation; // ±20%
-            return Math.floor(base + randomOffset);
-        };
+        let msg = personalizeEventText(event.text, randomC3Player?.gamertag ? randomC3Player.gamertag.charAt(0).toUpperCase() + randomC3Player.gamertag.slice(1) : null);
         
         // Apply rewards based on category
         const category = event.config?.category || 'gold';
@@ -939,13 +912,13 @@ function App() {
         
         switch(category) {
             case 'gold': {
-                const goldReward = randomizeValue(50000);
+                const goldReward = randomizeEventValue(50000);
                 updateMoney(goldReward);
                 msg += ` (+${goldReward.toLocaleString()} Gold)`;
                 break;
             }
             case 'gems': {
-                const gemReward = randomizeValue(15);
+                const gemReward = randomizeEventValue(15);
                 setResources(prev => {
                     const currentGems = prev.inventory.gems?.count || 0;
                     const currentGemsAvg = prev.inventory.gems?.avg || 0;
@@ -976,7 +949,7 @@ function App() {
                 break;
             }
             case 'inventory': {
-                const inventoryBonus = randomizeValue(25);
+                const inventoryBonus = randomizeEventValue(25);
                 setMaxInventory(prev => prev + inventoryBonus);
                 msg += ` (+${inventoryBonus} Inventory Space)`;
                 break;
@@ -989,55 +962,47 @@ function App() {
         triggerFlash('green');
         setEventMsg({ text: msg, type: msgType });
         setLog(prev => [msg, ...prev]);
-        return recalcPrices(locObj);
+        return handleRecalcPrices(locObj);
     }
     
     // 4. SIMPLE EVENTS
     let msg = event.text;
     let eventPriceMod = 1.0;
     
-    // NEW: Determine if it's good or bad
-    let msgType = 'neutral'; 
+    // Determine if it's good or bad
+    let msgType = determineEventMessageType(event.type);
 
     switch(event.type) {
         case 'heal': 
             setHealth(h => Math.min(h + event.config.value, maxHealth)); 
             triggerFlash('green'); 
             msg += ` (+${event.config.value} HP)`; 
-            msgType = 'good'; // <--- Explicitly Good
             break;
         case 'money': 
             updateMoney(event.config.value); 
             triggerFlash('gold'); 
             msg += ` (+${event.config.value} G)`; 
-            msgType = 'good'; // <--- Explicitly Good
             break;
         case 'price': 
             eventPriceMod = event.config.value; 
-            // Market Crash (0.5) is Good for buying? Bad for selling? 
-            // Usually events like "Market Crash" are neutral/alert info.
-            msgType = 'bad'; 
             break;
         case 'flavor': 
             setHealth(h => Math.min(h + 1, maxHealth)); 
-            msgType = 'good'; // Minor heal is good
             break;
         default: 
-            msgType = 'bad'; // Default to Alert/Red
+            // Default to Alert/Red
             break;
     }
 
     setEventMsg({ text: msg, type: msgType }); 
 
     setLog(prev => [msg, ...prev]);
-    return recalcPrices(locObj, eventPriceMod);
+    return handleRecalcPrices(locObj, eventPriceMod);
   };
 
   // --- UNIFIED ROLL HANDLERS ---
   const startRoll = () => {
-      const array = new Uint32Array(1);
-      window.crypto.getRandomValues(array);
-      const d20 = (array[0] % 20) + 1;
+      const d20 = generateD20Roll();
       setRollTarget(d20);
       setIsRolling(true);
   };
@@ -1046,91 +1011,31 @@ function App() {
       setTimeout(() => { finishEvent(rollTarget); setIsRolling(false); setRollTarget(null); }, 800);
   };
 
-    const normalizeStatName = (statName) => {
-        if (!statName) return 'combat';
-        const key = String(statName).toLowerCase();
-        const aliases = {
-            wis: 'wisdom',
-            int: 'intelligence',
-            cha: 'charisma',
-            dex: 'dexterity',
-            con: 'constitution',
-            str: 'combat'
-        };
-        return aliases[key] || key;
-    };
-
-    const getStatModifier = (source, statName) => {
-        if (!source || !statName) return 0;
-        const value = source.stats?.[statName];
-        return Number.isFinite(value) ? value : 0;
-    };
-
-    const formatStatLabel = (statName) => {
-        if (!statName) return 'Check';
-        return statName.charAt(0).toUpperCase() + statName.slice(1);
-    };
-
-    const getEventRollBonusBreakdown = (event) => {
-        if (!event || !event.config?.stat) return { total: 0, breakdown: [] };
-
-        const stat = normalizeStatName(event.config.stat);
-        const breakdown = [];
-        let total = 0;
-
-        const raceStatBonus = getStatModifier(player.race, stat);
-        if (raceStatBonus !== 0) {
-            breakdown.push({ label: `${player.race.name} ${formatStatLabel(stat)}`, value: raceStatBonus });
-            total += raceStatBonus;
-        }
-
-        const classStatBonus = getStatModifier(player.class, stat);
-        if (classStatBonus !== 0) {
-            breakdown.push({ label: `${player.class.name} ${formatStatLabel(stat)}`, value: classStatBonus });
-            total += classStatBonus;
-        }
-
-        // Combat-specific sources are additive with general race/class stat bonuses.
-        if (stat === 'combat') {
-            if (combatBonus > 0) {
-                breakdown.push({ label: 'Weapon/Upgrade', value: combatBonus });
-                total += combatBonus;
-            }
-
-            if (player.race.id === 'kobold' && event.slug === 'dragon') {
-                breakdown.push({ label: 'Dragon Slayer (Kobold)', value: 5 });
-                total += 5;
-            }
-
-            if (player.race.id === 'halfling' && event.slug === 'guards') {
-                breakdown.push({ label: 'Guard Evasion (Halfling)', value: 5 });
-                total += 5;
-            }
-        }
-
-        return { total, breakdown };
-    };
-
   const finishEvent = (d20) => {
         if (!activeEvent) return;
         const config = activeEvent.config;
-        const bonus = getEventRollBonusBreakdown(activeEvent).total;
+        const bonus = getEventRollBonusBreakdown(activeEvent, player.race, player.class, combatBonus, playerItems).total;
+        const trackedMonsterSlug = activeEvent.type === 'combat'
+            ? String(activeEvent.slug || '').trim().toLowerCase()
+            : '';
         
-        const total = d20 + bonus;
-
-        let outcomeKey = 'fail';
-        if (d20 === 20) outcomeKey = 'crit_success';
-        else if (d20 === 1) outcomeKey = 'crit_fail';
-        else if (total >= config.difficulty) outcomeKey = 'success';
-
-        const outcomeData = config.outcomes[outcomeKey];
+        const { outcomeKey, total, outcomeData } = resolveOutcome(d20, bonus, config.difficulty, config);
         const effectText = applyOutcomeEffect(outcomeData.effect); 
 
         // Tracking Stats
         if (activeEvent.type === 'combat') {
             if (outcomeKey.includes('success')) {
                 setCombatStats(prev => ({ ...prev, wins: prev.wins + 1 }));
-                if (activeEvent.slug === 'dragon') setDragonsKilled(d => d + 1);
+                if (trackedMonsterSlug && !NON_MONSTER_COMBAT_SLUGS.has(trackedMonsterSlug)) {
+                    setMonsterKills(prev => ({
+                        ...prev,
+                        [trackedMonsterSlug]: (prev[trackedMonsterSlug] || 0) + 1,
+                    }));
+                }
+
+                if (DRAGON_KILL_SLUGS.has(trackedMonsterSlug)) {
+                    setDragonsKilled(d => d + 1);
+                }
             } else {
                 setCombatStats(prev => ({ ...prev, losses: prev.losses + 1 }));
             }
@@ -1188,80 +1093,62 @@ function App() {
   };
 
   const buyItem = (item) => {
-    const cost = getBuyPrice(currentPrices[item]);
-    const totalItems = Object.values(resources.inventory).reduce((a, b) => a + b.count, 0);
+    const cost = handleBuyPrice(currentPrices[item]);
+    const { newResources, canBuy } = calculateBuyItem(item, cost, resources, maxInventory);
     
-    // Check conditions before updating
-    if (totalItems >= maxInventory || resources.money < cost) return;
+    if (!canBuy) return;
     
-    setResources(prev => {
-        const currentInv = prev.inventory;
-        const currentItemData = currentInv[item];
-        const totalValue = (currentItemData.count * currentItemData.avg) + cost;
-        return { money: prev.money - cost, inventory: { ...currentInv, [item]: { count: currentItemData.count + 1, avg: totalValue / (currentItemData.count + 1) } } };
-    });
+    setResources(newResources);
     setHasTraded(true);
-};
+  };
 
-const buyMax = (item) => {
-    const cost = getBuyPrice(currentPrices[item]);
-    const totalItems = Object.values(resources.inventory).reduce((a, b) => a + b.count, 0);
-    const spaceLeft = maxInventory - totalItems;
-    const canAfford = Math.floor(resources.money / cost);
-    const amountToBuy = Math.min(spaceLeft, canAfford);
+  const buyMax = (item) => {
+    const cost = handleBuyPrice(currentPrices[item]);
+    const { newResources, amountBought } = calculateBuyMax(item, cost, resources, maxInventory);
     
-    // Check if action is possible
-    if (amountToBuy <= 0) return;
+    if (amountBought <= 0) return;
     
-    setResources(prev => {
-        const currentItemData = prev.inventory[item];
-        const totalCost = amountToBuy * cost;
-        const totalValue = (currentItemData.count * currentItemData.avg) + totalCost;
-        return { money: prev.money - totalCost, inventory: { ...prev.inventory, [item]: { count: currentItemData.count + amountToBuy, avg: totalValue / (currentItemData.count + amountToBuy) } } };
-    });
+    setResources(newResources);
     setHasTraded(true);
-};
+  };
 
-const sellItem = (item) => {
-    const currentCount = resources.inventory[item].count;
+  const sellItem = (item) => {
+    const value = handleSellPrice(currentPrices[item]);
+    const { newResources, canSell } = calculateSellItem(item, value, resources);
     
-    // Check if item exists to sell
-    if (currentCount <= 0) return;
+    if (!canSell) return;
     
-    const value = getSellPrice(currentPrices[item]);
-    setResources(prev => {
-        const currentInv = prev.inventory;
-        return { money: prev.money + value, inventory: { ...currentInv, [item]: { ...currentInv[item], count: currentInv[item].count - 1 } } };
-    });
+    setResources(newResources);
     setHasTraded(true);
-};
+  };
 
-const sellAll = (item) => {
-    const count = resources.inventory[item].count;
+  const sellAll = (item) => {
+    const value = handleSellPrice(currentPrices[item]);
+    const { newResources, canSell } = calculateSellAll(item, value, resources);
     
-    // Check if items exist to sell
-    if (count <= 0) return;
+    if (!canSell) return;
     
-    const value = getSellPrice(currentPrices[item]);
-    setResources(prev => {
-        return { money: prev.money + (value * count), inventory: { ...prev.inventory, [item]: { count: 0, avg: 0 } } };
-    });
+    setResources(newResources);
     setHasTraded(true);
-};
+  };
 
   const buyUpgrade = (upgrade) => {
     if (resources.money < upgrade.cost) return setLog(prev => ["Too expensive!", ...prev]);
-    if (upgrade.type === 'heal') {
+    // Handle healing items (Elixir of Life - numeric value means healing percentage)
+    if (upgrade.type === 'heal' || (upgrade.type === 'elixir' && typeof upgrade.value === 'number')) {
         if (health >= maxHealth) return setLog(prev => ["You are healthy!", ...prev]);
         const healAmount = Math.floor(maxHealth * upgrade.value);
         setHealth(h => Math.min(h + healAmount, maxHealth));
         setResources(prev => ({ ...prev, money: prev.money - upgrade.cost }));
-        triggerFlash('green'); return;
+        setElixirPurchases(prev => ({ ...prev, [upgrade.id]: (prev[upgrade.id] || 0) + 1 }));
+        triggerFlash('green'); 
+        return;
     }
     if (playerItems.find(i => i.id === upgrade.id)) return setLog(prev => ["Already own!", ...prev]);
-    
+
     let newItems = [...playerItems];
     let currentCombatBonus = combatBonus;
+    let currentDefense = defense;
 
     if (upgrade.type === 'combat') {
         const oldWeapon = newItems.find(i => i.type === 'combat');
@@ -1272,11 +1159,30 @@ const sellAll = (item) => {
             newItems = newItems.filter(i => i.id !== oldWeapon.id);
             setLog(prev => [`Dropped ${oldWeapon.name}.`, ...prev]);
         }
-        setCombatBonus(currentCombatBonus + upgrade.value);
-    } 
+        currentCombatBonus += upgrade.value;
+    }
+    if (upgrade.type === 'defense') {
+        const oldArmor = newItems.find(i => i.type === 'defense');
+        if (oldArmor) {
+            const confirmSwap = window.confirm(`You are wearing ${oldArmor.name}. Replace it with ${upgrade.name}?`);
+            if (!confirmSwap) return;
+            currentDefense -= oldArmor.value;
+            newItems = newItems.filter(i => i.id !== oldArmor.id);
+            setLog(prev => [`Removed ${oldArmor.name}.`, ...prev]);
+        }
+        currentDefense += upgrade.value;
+    }
     if (upgrade.type === 'inventory') setMaxInventory(m => m + upgrade.value);
+    if (upgrade.id === 'jonah') {
+        currentCombatBonus += upgrade.value.combat || 0;
+        setMaxInventory(m => m + (upgrade.value.inventory || 0));
+    }
+
+    setCombatBonus(currentCombatBonus);
+    if (upgrade.type === 'defense') setDefense(currentDefense);
     setResources(prev => ({ ...prev, money: prev.money - upgrade.cost }));
     setPlayerItems([...newItems, upgrade]);
+    setElixirPurchases(prev => ({ ...prev, [upgrade.id]: (prev[upgrade.id] || 0) + 1 }));
     setLog(prev => [`Bought ${upgrade.name}.`, ...prev]);
   };
 
@@ -1308,7 +1214,7 @@ const sellAll = (item) => {
     triggerRandomEvent(nextLoc);
   };
 
-    const activeEventBonus = getEventRollBonusBreakdown(activeEvent);
+    const activeEventBonus = getEventRollBonusBreakdown(activeEvent, player.race, player.class, combatBonus, playerItems);
 
   return (
     <>
@@ -1349,14 +1255,14 @@ const sellAll = (item) => {
       {gameState === 'playing' && <GameScreen 
           gamertag={userProfile?.gamertag || 'Wanderer'} 
           userProfile={userProfile} // <-- ADD THIS LINE
-          player={player} day={day} maxDays={MAX_DAYS} location={currentLocation} resources={resources} health={health} maxHealth={maxHealth} maxInventory={maxInventory} debt={debt} 
+          player={player} day={day} maxDays={MAX_DAYS} location={currentLocation} resources={resources} health={health} maxHealth={maxHealth} maxInventory={maxInventory} debt={debt} defense={defense}
           currentPrices={currentPrices} log={log} eventMsg={eventMsg} flash={flash} 
           activeEvent={activeEvent} // UNIFIED EVENT
           isRolling={isRolling} rollTarget={rollTarget}
           playerItems={playerItems} onPayDebt={payDebt} onTravel={handleEndTurn} onRestart={() => { if(window.confirm("Restart?")) { logGameSession('Quit (Restart)'); startGame(); }}} 
           onQuit={() => { if(window.confirm("Quit?")) { logGameSession('Quit (Menu)'); setGameState('start'); }}} 
-          getBuyPrice={getBuyPrice}
-          getSellPrice={getSellPrice}
+          getBuyPrice={handleBuyPrice}
+          getSellPrice={handleSellPrice}
           onBuy={buyItem} 
           onBuyMax={buyMax} 
           onSell={sellItem}

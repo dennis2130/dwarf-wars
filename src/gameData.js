@@ -2,13 +2,33 @@ import filter from 'leo-profanity';
 
 // --- METADATA ---
 export const GAME_META = {
-    version: "v1.1.6", // Change this number here to update everywhere!
+    version: "v1.1.7", // Change this number here to update everywhere!
     studio: "2130 Studios",
     releaseNotes: [
       {
+        version: "1.1.7",
+        date: "2026-03-29",
+        status: "current",
+        notes: [
+          "Marketplace tab expanded with new Alchemist shop for elixir items separate from equipment",
+          "Elixir items can now provide targeted stat bonuses (Combat, Inventory) with individual effects",
+          "Fixed C3 encounter name placeholders showing raw c3_player_name values instead of formatted text",
+          "Fixed multiple encounter text areas showing '+-' instead of '-' for negative values",
+          "Build Summary modal shows all active race/class/equipment/elixir modifiers at a glance",
+          "Click player name in top-left to open Build Summary with full modifier breakdown",
+          "Buy Mod and Sell Mod now display real gem prices from current market, showing actual impact of modifiers",
+          "Defense system now tracks all armor items and reduces incoming damage for better survivability",
+          "Display of new attributes: Intelligence, Charisma, Constitution, Stealth, and Sell Mod for better build optimization",
+          "Modal displays Buy/Sell modifier impact on gem prices with green/red coding for favorable/unfavorable trades",
+          "Fixed C3 check encounter filtering to properly enforce 3-per-run limit",
+          "Build Summary modal optimized for both mobile and desktop with compact, responsive design",
+          "All modifier cards show single-line breakdown with comma-separated sources for quick scanning",
+        ],
+      },
+      {
         version: "1.1.6",
         date: "2026-03-12",
-        status: "current",
+        status: "stable",
         notes: [
           "Channel 3 check events received a full voice pass for stronger flavor and more consistent tone",
           "Failure and critical failure outcomes for C3 checks were reworked so bad rolls feel materially punishing",
@@ -130,11 +150,11 @@ export const RACES = [
         buyMod: 0,
         sellMod: 0,
         combat: 1,
-        wisdom: 0,
-        intelligence: 0,
-        charisma: 0,
-        dexterity: 0,
-        constitution: 0,
+        wisdom: 1,
+        intelligence: 1,
+        charisma: 1,
+        dexterity: 1,
+        constitution: 1,
         stealth: 0
       }
     },
@@ -147,12 +167,12 @@ export const RACES = [
         buyMod: 0,
         sellMod: 0.10,
         combat: 0,
-        wisdom: 0,
-        intelligence: 0,
-        charisma: 0,
-        dexterity: 0,
-        constitution: 0,
-        stealth: 0
+        wisdom: 2,
+        intelligence: 1,
+        charisma: -1,
+        dexterity: -1,
+        constitution: 2,
+        stealth: -1
       }
     },
     { 
@@ -164,12 +184,12 @@ export const RACES = [
         buyMod: 0.15,
         sellMod: 0,
         combat: 0,
-        wisdom: 0,
-        intelligence: 0,
-        charisma: 0,
-        dexterity: 0,
-        constitution: 0,
-        stealth: 0
+        wisdom: 1,
+        intelligence: 2,
+        charisma: 2,
+        dexterity: 2,
+        constitution: -1,
+        stealth: 1
       }
     },
     { 
@@ -182,11 +202,11 @@ export const RACES = [
         sellMod: -0.05,
         combat: 2,
         wisdom: 0,
-        intelligence: 0,
-        charisma: 0,
+        intelligence: -1,
+        charisma: -2,
         dexterity: 0,
-        constitution: 0,
-        stealth: 0
+        constitution: 3,
+        stealth: -2
       }
     },
         { 
@@ -198,12 +218,12 @@ export const RACES = [
         buyMod: 0,
         sellMod: 0,
         combat: 0,
-        wisdom: 0,
-        intelligence: 0,
-        charisma: 0,
-        dexterity: 0,
+        wisdom: -1,
+        intelligence: 1,
+        charisma: -1,
+        dexterity: 2,
         constitution: 0,
-        stealth: 0
+        stealth: 2
       }
     },
     { 
@@ -216,11 +236,11 @@ export const RACES = [
         sellMod: 0.05,
         combat: 0,
         wisdom: 0,
-        intelligence: 0,
-        charisma: 0,
-        dexterity: 0,
+        intelligence: 1,
+        charisma: 1,
+        dexterity: 3,
         constitution: 0,
-        stealth: 0
+        stealth: 3
       }
     }
 ];
@@ -232,9 +252,9 @@ export const CLASSES = [
       startingDebt: 2000,
       stats: {
         combat: 0,
-        wisdom: 0,
+        wisdom: 2,
         intelligence: 0,
-        charisma: 0,
+        charisma: 3,
         dexterity: 0,
         constitution: 0,
         stealth: 0
@@ -242,12 +262,12 @@ export const CLASSES = [
     },
     { 
       id: 'merchant', name: 'Merchant', desc: 'Born to trade.',
-      startingMoney: 2000, 
+      startingMoney: 1500, 
       startingDebt: 10000,
       stats: {
-        combat: 0,
+        combat: -2,
         wisdom: 0,
-        intelligence: 0,
+        intelligence: 3,
         charisma: 0,
         dexterity: 0,
         constitution: 0,
@@ -259,13 +279,13 @@ export const CLASSES = [
       startingMoney: 0, 
       startingDebt: 0,
       stats: {
-        combat: 0,
-        wisdom: 0,
+        combat: 2,
+        wisdom: 3,
         intelligence: 0,
         charisma: 0,
-        dexterity: 0,
-        constitution: 0,
-        stealth: 0
+        dexterity: 2,
+        constitution: 2,
+        stealth: 2
       }
     },
     { 
@@ -277,9 +297,9 @@ export const CLASSES = [
         wisdom: 0,
         intelligence: 0,
         charisma: 0,
-        dexterity: 0,
+        dexterity: 3,
         constitution: 0,
-        stealth: 0
+        stealth: 3
       }
     },
     { 
@@ -287,13 +307,13 @@ export const CLASSES = [
       startingMoney: 600, 
       startingDebt: 6000,
       stats: {
-        combat: 0,
+        combat: 3,
         wisdom: 0,
-        intelligence: 0,
+        intelligence: -1,
         charisma: 0,
         dexterity: 0,
-        constitution: 0,
-        stealth: 0
+        constitution: 2,
+        stealth: -1
       }
     }, 
     { 
@@ -302,8 +322,8 @@ export const CLASSES = [
       startingDebt: 6000,
       stats: {
         combat: 0,
-        wisdom: 0,
-        intelligence: 0,
+        wisdom: 3,
+        intelligence: 3,
         charisma: 0,
         dexterity: 0,
         constitution: 0,
@@ -359,32 +379,33 @@ export const UPGRADES = [
     // --- WEAPONS (Standard) ---
     // WARRIOR BALANCE: Banned Warrior from Steel Sword & Hammer. 
     // They must go Dagger -> Great Sword -> Mithril Axe.
-    { id: 'dagger', name: 'Iron Dagger', type: 'combat', value: 2, cost: 500, desc: "+2 Combat Roll", ban: { class: 'wizard' } },
+    { id: 'dagger', name: 'Iron Dagger', type: 'combat', value: 2, cost: 500, desc: "+2 to Combat Roll", ban: { class: 'wizard' } },
     
-    { id: 'sword', name: 'Steel Sword', type: 'combat', value: 5, cost: 2000, desc: "+5 Combat Roll", 
+    { id: 'sword', name: 'Steel Sword', type: 'combat', value: 5, cost: 2000, desc: "+5 to Combat Roll", 
       ban: { race: ['halfling','kobold'], class: ['wizard', 'warrior'] } },
     
-    { id: 'hammer', name: 'War Hammer', type: 'combat', value: 8, cost: 8000, desc: "+8 Combat Roll", 
+    { id: 'hammer', name: 'War Hammer', type: 'combat', value: 8, cost: 8000, desc: "+8 to Combat Roll", 
       ban: { race: ['halfling','kobold', 'orc'], class: ['wizard','bard','rogue', 'warrior']} }, 
 
      // --- CLASS SPECIFIC ---
-    { id: 'crossbow', name: 'Crossbow', type: 'combat', value: 5, cost: 3000, desc: "+5 Combat", req: { class: 'rogue' } },
-    { id: 'sword2', name: 'Great Sword', type: 'combat', value: 7, cost: 3000, desc: "+7 Combat", req: { class: 'warrior' }, ban: {race: ['orc']} },
-    { id: 'scroll', name: 'Scroll: Frost Fingers', type: 'combat', value: 2, cost: 800, desc: "+2 Combat", req: { class: 'wizard' } },
-    { id: 'scroll1', name: 'Scroll: Acid Arrow', type: 'combat', value: 4, cost: 2000, desc: "+3 Combat", req: { class: 'wizard' } },
-    { id: 'scroll2', name: 'Scroll: Fireball', type: 'combat', value: 7, cost: 7000, desc: "+7 Combat", req: { class: 'wizard' } },
-    { id: 'axe3', name: 'Mithril Axe', type: 'combat', value: 10, cost: 10000, desc: "+10 Combat Roll", ban: { race: 'halfling' } , req: { class: 'warrior' } },
-    { id: 'lute', name: 'Master Lute', type: 'combat', value: 6, cost: 4500, desc: "+6 Combat", req: { class: 'bard' } },
-    { id: 'whip', name: 'Whip', type: 'combat', value: 5, cost: 3000, desc: "+5 Combat", req: { class: 'merchant' } },
-    { id: 'staff', name: 'Staff', type: 'combat', value: 6, cost: 4500, desc: "+6 Combat", req: { class: 'monk' } },
+    { id: 'crossbow', name: 'Crossbow', type: 'combat', value: 5, cost: 3000, desc: "+5 to Combat Roll", req: { class: 'rogue' } },
+    { id: 'sword2', name: 'Great Sword', type: 'combat', value: 7, cost: 3000, desc: "+7 to Combat Roll", req: { class: 'warrior' }, ban: {race: ['orc']} },
+    { id: 'scroll', name: 'Scroll: Frost Fingers', type: 'combat', value: 2, cost: 800, desc: "+2 to Combat Roll", req: { class: 'wizard' } },
+    { id: 'scroll1', name: 'Scroll: Acid Arrow', type: 'combat', value: 4, cost: 2000, desc: "+4 to Combat Roll", req: { class: 'wizard' } },
+    { id: 'scroll2', name: 'Scroll: Fireball', type: 'combat', value: 7, cost: 7000, desc: "+7 to Combat Roll", req: { class: 'wizard' } },
+    { id: 'axe3', name: 'Mithril Axe', type: 'combat', value: 10, cost: 10000, desc: "+10 to Combat Roll", ban: { race: 'halfling' } , req: { class: 'warrior' } },
+    { id: 'lute', name: 'Master Lute', type: 'combat', value: 6, cost: 4500, desc: "+6 to Combat Roll", req: { class: 'bard' } },
+    { id: 'whip', name: 'Whip', type: 'combat', value: 5, cost: 3000, desc: "+5 to Combat Roll", req: { class: 'merchant' } },
+    { id: 'staff', name: 'Staff', type: 'combat', value: 6, cost: 4500, desc: "+6 to Combat Roll", req: { class: 'monk' } },
 
     // --- RACE SPECIFIC ---
-    { id: 'axe2', name: 'Orcish Axe', type: 'combat', value: 6, cost: 6000, desc: "+6 Combat", req: { race: 'orc' } },
-    { id: 'slingshot', name: 'Halfling Sling', type: 'combat', value: 4, cost: 1500, desc: "+4 Combat", req: { race: 'halfling' } },
-    { id: 'spear', name: 'Kobold Spear', type: 'combat', value: 4, cost: 1500, desc: "+4 Combat", req: { race: 'kobold' } },
+    { id: 'axe2', name: 'Orcish Axe', type: 'combat', value: 6, cost: 6000, desc: "+6 to Combat Roll", req: { race: 'orc' } },
+    { id: 'slingshot', name: 'Halfling Sling', type: 'combat', value: 4, cost: 1500, desc: "+4 to Combat Roll", req: { race: 'halfling' } },
+    { id: 'spear', name: 'Kobold Spear', type: 'combat', value: 4, cost: 1500, desc: "+4 to Combat Roll", req: { race: 'kobold' } },
 
     // --- CONSUMABLE ---
-    { id: 'elixir', name: 'Elixir of Life', type: 'heal', value: 0.75, cost: 10000, desc: "Heals 75% HP" }
+    { id: 'elixir', name: 'Elixir of Life', type: 'elixir', value: 0.75, cost: 10000, desc: "Heals 75% HP" },
+    { id: 'jonah', name: "Jonah's Glass of Milk", type: 'elixir', value: { combat: 2, inventory: 20 }, cost: 100000, desc: "+2 to Combat Roll, +20 Inventory" }
 ];
 
 // --- PROFANITY FILTER ---

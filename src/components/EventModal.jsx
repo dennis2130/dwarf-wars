@@ -20,10 +20,11 @@ export default function EventModal({ event, isRolling, rollTarget, onRoll, onClo
     // 2. HELPER: Capitalize first letter of string
     const capitalizeFirstLetter = (str) => str.charAt(0).toUpperCase() + str.slice(1);
 
-    // 3. HELPER: Personalize event text with C3 player name
+    // 3. HELPER: Personalize event text with C3 player name or fallback
     const personalizeText = (text) => {
-        if (!c3_player || !c3_player.gamertag) return text;
-        const displayName = capitalizeFirstLetter(c3_player.gamertag);
+        const displayName = c3_player && c3_player.gamertag
+            ? capitalizeFirstLetter(c3_player.gamertag)
+            : 'Adventurer';
         return text.replace('{c3_player_name}', displayName)
                    .replace('{player_name}', displayName);
     };
@@ -95,7 +96,7 @@ export default function EventModal({ event, isRolling, rollTarget, onRoll, onClo
             <div className={`rounded-xl p-6 w-full max-w-sm text-center shadow-2xl border-2 animate-in zoom-in duration-200 bg-slate-900 ${theme.borderColor}`}>
                 
                 <h2 className={`text-xl font-bold mb-4 text-white uppercase tracking-widest`}>
-                    {isC3Event ? 'Ally Encounter' : `${event.config.stat} CHECK`}
+                    {isC3Event ? `${event.config?.stat ? event.config.stat.charAt(0).toUpperCase() + event.config.stat.slice(1) : 'Charisma'} - Ally Encounter` : `${event.config.stat} CHECK`}
                 </h2>
 
                 {/* C3 PLAYER BADGE */}
@@ -128,12 +129,12 @@ export default function EventModal({ event, isRolling, rollTarget, onRoll, onClo
                             {combatActions.bonusBreakdown.breakdown.map((item, idx) => (
                                 <div key={idx} className="flex justify-between text-xs text-slate-400">
                                     <span>{item.label}</span>
-                                    <span className="text-slate-200 font-bold">+{item.value}</span>
+                                    <span className="text-slate-200 font-bold">{item.value > 0 ? '+' : ''}{item.value}</span>
                                 </div>
                             ))}
                             <div className="flex justify-between text-xs pt-1 border-t border-slate-600 mt-1">
                                 <span className="text-slate-300 font-bold">Total Bonus</span>
-                                <span className="text-blue-400 font-bold">+{combatActions.bonusBreakdown.total}</span>
+                                <span className="text-blue-400 font-bold">{combatActions.bonusBreakdown.total > 0 ? '+' : ''}{combatActions.bonusBreakdown.total}</span>
                             </div>
                         </div>
                     </div>

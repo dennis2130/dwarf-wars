@@ -41,6 +41,7 @@ export default function HelpScreen({ onClose }) {
                         <li><strong>MAX Button:</strong> Buys as many items as you can afford and carry.</li>
                         <li><strong>ALL Button:</strong> Sells your entire stock of an item instantly.</li>
                         <li><strong>Buy/Sell:</strong> Tap to trade one item, or hold down to trade quickly.</li>
+                        <li><strong>Player Name:</strong> Click your name in the top-left to view your Build Summary and see all active modifiers.</li>
                     </ul>
                 </section>
 
@@ -51,6 +52,8 @@ export default function HelpScreen({ onClose }) {
                         <li><strong className="text-white">Bleed:</strong> If HP drops below 25%, you take damage every time you travel.</li>
                         <li><strong className="text-white">Guards:</strong> If your Net Worth is greater than 1 Million, the City Watch will try to tax you.</li>
                         <li><strong className="text-white">Dragons:</strong> High damage, high loot. Requires weapons to defeat.</li>
+                        <li><strong className="text-white">Encounters:</strong> Purple checks for Wisdom, Knowledge, or Charisma appear randomly. Your race/class bonuses help pass these tests.</li>
+                        <li><strong className="text-white">Modifiers:</strong> Some encounters are affected by Intelligence, Dexterity, Stealth, and Constitution—not just Combat. Build for diversity.</li>
                     </ul>
                 </section>
 
