@@ -155,7 +155,7 @@ export const RACES = [
         charisma: 1,
         dexterity: 1,
         constitution: 1,
-        stealth: 0
+        stealth: 1
       }
     },
     { 
@@ -405,7 +405,17 @@ export const UPGRADES = [
 
     // --- CONSUMABLE ---
     { id: 'elixir', name: 'Elixir of Life', type: 'elixir', value: 0.75, cost: 10000, desc: "Heals 75% HP" },
-    { id: 'jonah', name: "Jonah's Glass of Milk", type: 'elixir', value: { combat: 2, inventory: 20 }, cost: 100000, desc: "+2 to Combat Roll, +20 Inventory" }
+    { id: 'jonah', name: "Jonah's Glass of Milk", type: 'elixir', value: { combat: 2, inventory: 20 }, cost: 200000, desc: "+2 to Combat Roll, +20 Inventory" },
+
+    // --- ALCHEMIST SHOP - MULTI-ATTRIBUTE ITEMS ---
+    { id: 'dragonscale', name: 'Dragonscale Draught', type: 'elixir', value: { combat: 5, defense: 2 }, cost: 150000, desc: "+5 Combat, +2 Defense" },
+    { id: 'philosopher_stone', name: "Philosopher's Stone Dust", type: 'elixir', value: { intelligence: 4, wisdom: 2, charisma: 1 }, cost: 140000, desc: "+4 Intelligence, +2 Wisdom, +1 Charisma" },
+    { id: 'merchant_windfall', name: "Merchant's Windfall", type: 'elixir', value: { buyMod: 0.05, sellMod: 0.03 }, cost: 180000, desc: "+5% Buy Discount, +3% Sell Bonus" },
+    { id: 'void_dust', name: 'Void-touched Dust', type: 'elixir', value: { stealth: 4, dexterity: 2, intelligence: 1 }, cost: 140000, desc: "+4 Stealth, +2 Dexterity, +1 Intelligence" },
+    { id: 'vitality_nectar', name: 'Vitality Nectar', type: 'elixir', value: { health: 5, constitution: 3 }, cost: 130000, desc: "+5 Health, +3 Constitution" },
+    { id: 'pouch_essence', name: 'Bottomless Pouch Essence', type: 'elixir', value: { inventory: 5, combat: 2 }, cost: 140000, desc: "+5 Inventory, +2 Combat" },
+    { id: 'feline_grace', name: "Feline's Grace Oil", type: 'elixir', value: { dexterity: 4, charisma: 2, wisdom: 1 }, cost: 140000, desc: "+4 Dexterity, +2 Charisma, +1 Wisdom" },
+    { id: 'siren_pearl', name: "Siren's Pearl Powder", type: 'elixir', value: { charisma: 4, wisdom: 2, intelligence: 1 }, cost: 140000, desc: "+4 Charisma, +2 Wisdom, +1 Intelligence" }
 ];
 
 // --- PROFANITY FILTER ---
