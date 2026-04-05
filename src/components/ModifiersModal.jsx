@@ -31,6 +31,27 @@ export default function ModifiersModal({ isOpen, onClose, playerRace, playerClas
     const elixirInventory = elixirs.reduce((sum, e) => {
         return sum + (typeof e.value === 'object' && e.value.inventory ? e.value.inventory : 0);
     }, 0);
+    const elixirHealth = elixirs.reduce((sum, e) => {
+        return sum + (typeof e.value === 'object' && e.value.health ? e.value.health : 0);
+    }, 0);
+    const elixirWisdom = elixirs.reduce((sum, e) => {
+        return sum + (typeof e.value === 'object' && e.value.wisdom ? e.value.wisdom : 0);
+    }, 0);
+    const elixirIntelligence = elixirs.reduce((sum, e) => {
+        return sum + (typeof e.value === 'object' && e.value.intelligence ? e.value.intelligence : 0);
+    }, 0);
+    const elixirCharisma = elixirs.reduce((sum, e) => {
+        return sum + (typeof e.value === 'object' && e.value.charisma ? e.value.charisma : 0);
+    }, 0);
+    const elixirDexterity = elixirs.reduce((sum, e) => {
+        return sum + (typeof e.value === 'object' && e.value.dexterity ? e.value.dexterity : 0);
+    }, 0);
+    const elixirConstitution = elixirs.reduce((sum, e) => {
+        return sum + (typeof e.value === 'object' && e.value.constitution ? e.value.constitution : 0);
+    }, 0);
+    const elixirStealth = elixirs.reduce((sum, e) => {
+        return sum + (typeof e.value === 'object' && e.value.stealth ? e.value.stealth : 0);
+    }, 0);
     const elixirBuyMod = elixirs.reduce((sum, e) => {
         return sum + (typeof e.value === 'object' && e.value.buyMod ? e.value.buyMod : 0);
     }, 0);
@@ -42,14 +63,14 @@ export default function ModifiersModal({ isOpen, onClose, playerRace, playerClas
     const attributes = [
         { name: 'Combat', race: playerRace.stats.combat || 0, class: playerClass.stats.combat || 0, equipment: weaponBonus, elixir: elixirCombat },
         { name: 'Inventory', race: playerRace.stats.inventory || 0, class: playerClass.stats.inventory || 0, equipment: inventoryBonus, elixir: elixirInventory },
-        { name: 'Health', race: playerRace.stats.health || 0, class: playerClass.stats.health || 0, equipment: 0, elixir: 0 },
+        { name: 'Health', race: playerRace.stats.health || 0, class: playerClass.stats.health || 0, equipment: 0, elixir: elixirHealth },
         { name: 'Defense', race: playerRace.id === 'orc' ? 5 : 0, class: 0, equipment: armorBonus, elixir: 0 },
-        { name: 'Wisdom', race: playerRace.stats.wisdom || 0, class: playerClass.stats.wisdom || 0, equipment: 0, elixir: 0 },
-        { name: 'Intelligence', race: playerRace.stats.intelligence || 0, class: playerClass.stats.intelligence || 0, equipment: 0, elixir: 0 },
-        { name: 'Charisma', race: playerRace.stats.charisma || 0, class: playerClass.stats.charisma || 0, equipment: 0, elixir: 0 },
-        { name: 'Dexterity', race: playerRace.stats.dexterity || 0, class: playerClass.stats.dexterity || 0, equipment: 0, elixir: 0 },
-        { name: 'Constitution', race: playerRace.stats.constitution || 0, class: playerClass.stats.constitution || 0, equipment: 0, elixir: 0 },
-        { name: 'Stealth', race: playerRace.stats.stealth || 0, class: playerClass.stats.stealth || 0, equipment: 0, elixir: 0 },
+        { name: 'Wisdom', race: playerRace.stats.wisdom || 0, class: playerClass.stats.wisdom || 0, equipment: 0, elixir: elixirWisdom },
+        { name: 'Intelligence', race: playerRace.stats.intelligence || 0, class: playerClass.stats.intelligence || 0, equipment: 0, elixir: elixirIntelligence },
+        { name: 'Charisma', race: playerRace.stats.charisma || 0, class: playerClass.stats.charisma || 0, equipment: 0, elixir: elixirCharisma },
+        { name: 'Dexterity', race: playerRace.stats.dexterity || 0, class: playerClass.stats.dexterity || 0, equipment: 0, elixir: elixirDexterity },
+        { name: 'Constitution', race: playerRace.stats.constitution || 0, class: playerClass.stats.constitution || 0, equipment: 0, elixir: elixirConstitution },
+        { name: 'Stealth', race: playerRace.stats.stealth || 0, class: playerClass.stats.stealth || 0, equipment: 0, elixir: elixirStealth },
         { name: 'Buy Mod', race: playerRace.stats.buyMod || 0, class: playerClass.stats.buyMod || 0, equipment: 0, elixir: elixirBuyMod, isPercent: true },
         { name: 'Sell Mod', race: playerRace.stats.sellMod || 0, class: playerClass.stats.sellMod || 0, equipment: 0, elixir: elixirSellMod, isPercent: true },
     ];

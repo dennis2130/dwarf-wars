@@ -48,12 +48,12 @@ export const getEventRollBonusBreakdown = (event, playerRace, playerClass, comba
         let weaponBonus = 0;
         let elixirBonus = 0;
         
-        // Check playerItems for weapons (type 'combat') and elixirs (id 'jonah')
+        // Check playerItems for weapons (type 'combat') and elixirs with combat bonus
         playerItems.forEach(item => {
             if (item.type === 'combat' && typeof item.value === 'number') {
                 weaponBonus += item.value;
             }
-            if (item.id === 'jonah' && item.value?.combat) {
+            if (item.type === 'elixir' && typeof item.value === 'object' && item.value.combat) {
                 elixirBonus += item.value.combat;
             }
         });
@@ -76,6 +76,19 @@ export const getEventRollBonusBreakdown = (event, playerRace, playerClass, comba
         if (playerRace.id === 'halfling' && event.slug === 'guards') {
             breakdown.push({ label: 'Guard Evasion (Halfling)', value: 5 });
             total += 5;
+        }
+    } else {
+        // For non-combat stats, check elixir items for bonuses
+        let elixirStatBonus = 0;
+        playerItems.forEach(item => {
+            if (item.type === 'elixir' && typeof item.value === 'object' && item.value[stat]) {
+                elixirStatBonus += item.value[stat];
+            }
+        });
+
+        if (elixirStatBonus !== 0) {
+            breakdown.push({ label: 'Elixir', value: elixirStatBonus });
+            total += elixirStatBonus;
         }
     }
 

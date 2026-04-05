@@ -600,15 +600,49 @@ function App() {
   };
 
   // --- MARKET & PRICING ---
-  const handleBuyPrice = (basePrice) => getBuyPrice(basePrice, player.race);
-  const handleSellPrice = (basePrice) => getSellPrice(basePrice, player.race);
+  // Calculate total buy/sell mods from all sources (race + class + elixir items)
+  const getTotalBuyMod = () => {
+    const raceBuyMod = player.race?.stats?.buyMod || 0;
+    const classBuyMod = player.class?.stats?.buyMod || 0;
+    const elixirBuyMod = playerItems.reduce((sum, item) => {
+      return sum + (typeof item.value === 'object' && item.value.buyMod ? item.value.buyMod : 0);
+    }, 0);
+    return raceBuyMod + classBuyMod + elixirBuyMod;
+  };
+
+  const getTotalSellMod = () => {
+    const raceSellMod = player.race?.stats?.sellMod || 0;
+    const classSellMod = player.class?.stats?.sellMod || 0;
+    const elixirSellMod = playerItems.reduce((sum, item) => {
+      return sum + (typeof item.value === 'object' && item.value.sellMod ? item.value.sellMod : 0);
+    }, 0);
+    return raceSellMod + classSellMod + elixirSellMod;
+  };
+
+  const handleBuyPrice = (basePrice) => getBuyPrice(basePrice, getTotalBuyMod());
+  const handleSellPrice = (basePrice) => getSellPrice(basePrice, getTotalSellMod());
   const handleRecalcPrices = (locObj, randomEventMod = 1.0) => {
     const newPrices = calcMarketPrices(locObj, randomEventMod);
     setCurrentPrices(newPrices);
   };
 
+  // Shopkeeper responses by location - in-character world building
+  const getShopkeeperResponse = (locationName) => {
+    const responses = {
+      "The Royal City": "The Royal merchant looks you over with a knowing smile. \"Not in my establishment, friend.\"",
+      "Goblin Slums": "The goblin shopkeeper squints at you. \"Eh? Ya think I just fell off da turnip cart?\"",
+      "Elven Forest": "The elf sighs deeply, as if carrying the weight of millennia. \"I cannot allow such... imbalance in my forest.\"",
+      "Iron Forge": "The dwarf strokes his beard thoughtfully. \"Nay, lad. That deal don't sit right with me conscience.\"",
+      "Orc Badlands": "The orc growls menacingly. \"You try to trick Grok? Grok no fool!\"",
+    };
+    return responses[locationName] || "The shopkeeper eyes you suspiciously. \"I wasn't born yesterday,\" they say.";
+  };
+
   const triggerFlash = (color) => { setFlash(color); setTimeout(() => setFlash(''), 300); };
-  const updateMoney = (amount) => { setResources(prev => ({ ...prev, money: Math.max(0, prev.money + amount) })); };
+  const updateMoney = (amount) => { 
+    const roundedAmount = Math.round(amount); // Ensure amount is always an integer
+    setResources(prev => ({ ...prev, money: Math.max(0, Math.round(prev.money + roundedAmount)) })); 
+  };
 
   // --- HELPER: EVENT OUTCOMES ---
   const applyOutcomeEffect = (effect) => {
@@ -624,11 +658,12 @@ function App() {
 
       // Gold
       if (effect.gold) {
-          updateMoney(effect.gold);
-          summary.push(formatSignedValue(effect.gold, 'g'));
+          const roundedGold = Math.round(effect.gold); // Ensure gold is always integer
+          updateMoney(roundedGold);
+          summary.push(formatSignedValue(roundedGold, 'g'));
       }
       if (effect.gold_pct) {
-          const delta = Math.floor(resources.money * effect.gold_pct);
+          const delta = Math.round(resources.money * effect.gold_pct); // Round percentage results
           updateMoney(delta);
           summary.push(formatSignedValue(delta, 'g'));
       }
@@ -693,7 +728,7 @@ function App() {
           const rawCount = Number(effect.amount ?? 1);
           setResources(prev => {
               const currentInv = prev.inventory;
-              const currentItem = currentInv[item] || { count: 0, avg: 0 };
+              const currentItem = currentInv[item] || { count: 0, avg: 0, purchaseLocation: null, purchaseDay: null };
               const totalItems = Object.values(currentInv).reduce((a, b) => a + b.count, 0);
               const appliedCount = rawCount > 0
                   ? rawCount
@@ -712,7 +747,13 @@ function App() {
                   ...prev,
                   inventory: {
                       ...currentInv,
-                      [item]: { ...currentItem, count: newCount, avg: newAvg }
+                      [item]: { 
+                          ...currentItem, 
+                          count: newCount, 
+                          avg: newAvg,
+                          purchaseLocation: currentItem.purchaseLocation,
+                          purchaseDay: currentItem.purchaseDay
+                      }
                   }
               };
           });
@@ -729,14 +770,15 @@ function App() {
               if (count === 0) {
                   // Use current location price
                   const price = currentPrices[item] || 0;
-                  newMoney -= price;
-                  summary.push(`Lost ${price}g for missing ${item}`);
+                  const roundedPrice = Math.round(price); // Ensure price is integer
+                  newMoney = Math.round(newMoney - roundedPrice);
+                  summary.push(`Lost ${roundedPrice}g for missing ${item}`);
               } else {
                   summary.push(`Lost all ${item}`);
               }
               return {
                   ...prev,
-                  money: newMoney,
+                  money: Math.max(0, newMoney),
                   inventory: { ...currentInv, [item]: { count: 0, avg: 0 } }
               };
           });
@@ -1085,7 +1127,7 @@ function App() {
       setDay(day + 1);
       if (debt > 0) { setDebt(d => d + Math.ceil(debt * 0.05)); }
 
-      const wage = Math.floor(Math.random() * 150) + 50; 
+      const wage = Math.floor(Math.random() * 250) + 250; 
       updateMoney(wage);
       setLog(prev => [`Worked odd jobs. Earned ${wage}g.`, ...prev]);
       triggerFlash('green');
@@ -1094,7 +1136,7 @@ function App() {
 
   const buyItem = (item) => {
     const cost = handleBuyPrice(currentPrices[item]);
-    const { newResources, canBuy } = calculateBuyItem(item, cost, resources, maxInventory);
+    const { newResources, canBuy } = calculateBuyItem(item, cost, resources, maxInventory, currentLocation.name, day);
     
     if (!canBuy) return;
     
@@ -1104,7 +1146,7 @@ function App() {
 
   const buyMax = (item) => {
     const cost = handleBuyPrice(currentPrices[item]);
-    const { newResources, amountBought } = calculateBuyMax(item, cost, resources, maxInventory);
+    const { newResources, amountBought } = calculateBuyMax(item, cost, resources, maxInventory, currentLocation.name, day);
     
     if (amountBought <= 0) return;
     
@@ -1114,6 +1156,21 @@ function App() {
 
   const sellItem = (item) => {
     const value = handleSellPrice(currentPrices[item]);
+    const itemData = resources.inventory[item];
+    const originalCost = itemData?.avg || 0;
+    const purchaseLocation = itemData?.purchaseLocation;
+    const purchaseDay = itemData?.purchaseDay;
+    
+    // Anti-infinite-money check: prevent selling for more than purchased price
+    // But ONLY if selling at the same location on the same day
+    // Allow selling anywhere if: (1) item was free (originalCost = 0), or (2) different location/day
+    if (originalCost > 0 && value > originalCost && purchaseLocation === currentLocation.name && purchaseDay === day) {
+      const message = getShopkeeperResponse(currentLocation.name);
+      setEventMsg({ text: message, type: 'bad' });
+      setTimeout(() => setEventMsg(null), 3000);
+      return;
+    }
+    
     const { newResources, canSell } = calculateSellItem(item, value, resources);
     
     if (!canSell) return;
@@ -1124,6 +1181,21 @@ function App() {
 
   const sellAll = (item) => {
     const value = handleSellPrice(currentPrices[item]);
+    const itemData = resources.inventory[item];
+    const originalCost = itemData?.avg || 0;
+    const purchaseLocation = itemData?.purchaseLocation;
+    const purchaseDay = itemData?.purchaseDay;
+    
+    // Anti-infinite-money check: prevent selling for more than purchased price
+    // But ONLY if selling at the same location on the same day
+    // Allow selling anywhere if: (1) item was free (originalCost = 0), or (2) different location/day
+    if (originalCost > 0 && value > originalCost && purchaseLocation === currentLocation.name && purchaseDay === day) {
+      const message = getShopkeeperResponse(currentLocation.name);
+      setEventMsg({ text: message, type: 'bad' });
+      setTimeout(() => setEventMsg(null), 3000);
+      return;
+    }
+    
     const { newResources, canSell } = calculateSellAll(item, value, resources);
     
     if (!canSell) return;
@@ -1198,7 +1270,7 @@ function App() {
         const amount = Math.min(prev.money, debt);
         setDebt(d => Math.max(0, d - amount)); // Ensure debt never goes negative
         setLog(logPrev => [`Paid ${amount}g to the Vault.`, ...logPrev]);
-        return { ...prev, money: prev.money - amount };
+        return { ...prev, money: Math.round(prev.money - amount) }; // Ensure money stays as integer
     });
   };
 
@@ -1207,7 +1279,7 @@ function App() {
     setDay(d => d + 1);
     if (debt > 0) { setDebt(d => d + Math.ceil(debt * 0.05)); }
     if (!hasTraded) {
-        const wage = Math.floor(Math.random() * 150) + 50;
+        const wage = Math.floor(Math.random() * 250) + 250;
         updateMoney(wage);
         setLog(prev => [`Worked passage to next city. Earned ${wage}g.`, ...prev]);
         triggerFlash('green');

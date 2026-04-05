@@ -3,13 +3,13 @@ import { BASE_PRICES } from '../gameData';
 export const getBuyPrice = (basePrice, buyModOrRace = 0) => {
     // Support both old (playerRace object) and new (numeric buyMod) signatures for backwards compatibility
     const buyMod = typeof buyModOrRace === 'object' ? (buyModOrRace?.stats?.buyMod || 0) : buyModOrRace;
-    return Math.ceil(basePrice * (1.0 - buyMod));
+    return Math.round(Math.ceil(basePrice * (1.0 - buyMod)));
 };
 
 export const getSellPrice = (basePrice, sellModOrRace = 0) => {
     // Support both old (playerRace object) and new (numeric sellMod) signatures for backwards compatibility
     const sellMod = typeof sellModOrRace === 'object' ? (sellModOrRace?.stats?.sellMod || 0) : sellModOrRace;
-    return Math.floor(basePrice * 0.80 * (1.0 + sellMod));
+    return Math.round(Math.floor(basePrice * 0.80 * (1.0 + sellMod)));
 };
 
 export const recalcPrices = (location, randomEventMod = 1.0) => {
@@ -25,7 +25,7 @@ export const recalcPrices = (location, randomEventMod = 1.0) => {
 };
 
 // Inventory transaction calculations (pure functions)
-export const calculateBuyItem = (item, cost, resources, maxInventory) => {
+export const calculateBuyItem = (item, cost, resources, maxInventory, purchaseLocation = null, purchaseDay = null) => {
     const totalItems = Object.values(resources.inventory).reduce((a, b) => a + b.count, 0);
     
     if (totalItems >= maxInventory || resources.money < cost) {
@@ -37,12 +37,14 @@ export const calculateBuyItem = (item, cost, resources, maxInventory) => {
     const totalValue = (currentItemData.count * currentItemData.avg) + cost;
     
     const newResources = {
-        money: resources.money - cost,
+        money: Math.round(resources.money - cost), // Ensure money is integer
         inventory: {
             ...currentInv,
             [item]: {
                 count: currentItemData.count + 1,
-                avg: totalValue / (currentItemData.count + 1)
+                avg: totalValue / (currentItemData.count + 1),
+                purchaseLocation: purchaseLocation || currentItemData.purchaseLocation,
+                purchaseDay: purchaseDay !== undefined ? purchaseDay : currentItemData.purchaseDay
             }
         }
     };
@@ -50,7 +52,7 @@ export const calculateBuyItem = (item, cost, resources, maxInventory) => {
     return { newResources, canBuy: true };
 };
 
-export const calculateBuyMax = (item, cost, resources, maxInventory) => {
+export const calculateBuyMax = (item, cost, resources, maxInventory, purchaseLocation = null, purchaseDay = null) => {
     const totalItems = Object.values(resources.inventory).reduce((a, b) => a + b.count, 0);
     const spaceLeft = maxInventory - totalItems;
     const canAfford = Math.floor(resources.money / cost);
@@ -65,12 +67,14 @@ export const calculateBuyMax = (item, cost, resources, maxInventory) => {
     const totalValue = (currentItemData.count * currentItemData.avg) + totalCost;
     
     const newResources = {
-        money: resources.money - totalCost,
+        money: Math.round(resources.money - totalCost), // Ensure money is integer
         inventory: {
             ...resources.inventory,
             [item]: {
                 count: currentItemData.count + amountToBuy,
-                avg: totalValue / (currentItemData.count + amountToBuy)
+                avg: totalValue / (currentItemData.count + amountToBuy),
+                purchaseLocation: purchaseLocation || currentItemData.purchaseLocation,
+                purchaseDay: purchaseDay !== undefined ? purchaseDay : currentItemData.purchaseDay
             }
         }
     };
@@ -86,7 +90,7 @@ export const calculateSellItem = (item, value, resources) => {
     }
     
     const newResources = {
-        money: resources.money + value,
+        money: Math.round(resources.money + value), // Ensure money is integer
         inventory: {
             ...resources.inventory,
             [item]: { ...resources.inventory[item], count: resources.inventory[item].count - 1 }
@@ -104,7 +108,7 @@ export const calculateSellAll = (item, value, resources) => {
     }
     
     const newResources = {
-        money: resources.money + (value * count),
+        money: Math.round(resources.money + (value * count)), // Ensure money is integer
         inventory: {
             ...resources.inventory,
             [item]: { count: 0, avg: 0 }

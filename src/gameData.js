@@ -2,13 +2,31 @@ import filter from 'leo-profanity';
 
 // --- METADATA ---
 export const GAME_META = {
-    version: "v1.1.7", // Change this number here to update everywhere!
+    version: "v1.1.8", // Change this number here to update everywhere!
     studio: "2130 Studios",
     releaseNotes: [
       {
+        version: "1.1.8",
+        date: "2026-04-05",
+        status: "current",
+        notes: [
+          "Fixed gold values incorrectly becoming decimal amounts after purchases and event effects",
+          "All monetary transactions now properly round to whole numbers to prevent fractional gold",
+          "Fixed buy price calculation to include all modifiers (race, class, elixir) matching displayed price",
+          "Players can now spend their last gold on items since purchase check uses correct modified price",
+          "Added shopkeeper logic to prevent instant profit: cannot sell items back for more than purchased",
+          "Arbitrage prevention now limited to same location and day - traveling unlocks market opportunities",
+          "Blocked infinite money glitch by preventing arbitrage from buy/sell mod combinations",
+          "Shopkeepers now respond with in-character messages when blocking arbitrage attempts - unique personality per location and race",
+          "Fixed Alchemist items to properly apply stat bonuses (Intelligence, Wisdom, Charisma, Stealth, Dexterity) to encounter rolls",
+          "Alchemist item stat bonuses now display correctly in Character Sheet modal",
+          "Increased work and travel wages from 50-200g to 250-500g per day",
+        ],
+      },
+      {
         version: "1.1.7",
         date: "2026-03-29",
-        status: "current",
+        status: "stable",
         notes: [
           "Marketplace tab expanded with new Alchemist shop for elixir items separate from equipment",
           "Elixir items can now provide targeted stat bonuses (Combat, Inventory) with individual effects",
