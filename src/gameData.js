@@ -219,11 +219,11 @@ export const RACES = [
       id: 'orc', name: 'Orc', desc: 'Intimidating.',
       bonus: 'Huge Inventory & Strong',
       stats: {
-        inventory: 40,
+        inventory: 50,
         health: 20,
         buyMod: -0.05,
         sellMod: -0.05,
-        combat: 2,
+        combat: 3,
         wisdom: 0,
         intelligence: -1,
         charisma: -2,
@@ -258,7 +258,7 @@ export const RACES = [
         buyMod: 0.05,
         sellMod: 0.05,
         combat: 0,
-        wisdom: 0,
+        wisdom: 1,
         intelligence: 1,
         charisma: 1,
         dexterity: 3,
@@ -314,12 +314,12 @@ export const CLASSES = [
         constitution: 2,
         stealth: 2,
         buyMod: 0,
-        sellMod: .10
+        sellMod: .15
       }
     },
     { 
       id: 'rogue', name: 'Rogue', desc: 'Hidden in Shadows.',
-      startingMoney: 900, 
+      startingMoney: 1300, 
       startingDebt: 3000,
       stats: {
         combat: 0,
@@ -440,7 +440,7 @@ export const UPGRADES = [
 
     // --- CONSUMABLE ---
     { id: 'elixir', name: 'Elixir of Life', type: 'elixir', value: 0.75, cost: 10000, desc: "Heals 75% HP" },
-    { id: 'jonah', name: "Jonah's Glass of Milk", type: 'elixir', value: { combat: 2, inventory: 20 }, cost: 200000, desc: "+2 to Combat Roll, +20 Inventory" },
+    { id: 'jonah', name: "Jonah's Glass of Milk", type: 'elixir', value: { combat: 2, inventory: 30 }, cost: 200000, desc: "+2 to Combat Roll, +20 Inventory" },
 
     // --- ALCHEMIST SHOP - MULTI-ATTRIBUTE ITEMS ---
     { id: 'dragonscale', name: 'Dragonscale Draught', type: 'elixir', value: { combat: 5, defense: 2 }, cost: 150000, desc: "+5 Combat, +2 Defense" },
