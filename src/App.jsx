@@ -906,7 +906,7 @@ function App() {
 
     // Calculate Net Worth and filter/select event using service
     const netWorth = calculateNetWorth(resources, currentPrices, handleSellPrice);
-    const validEvents = filterValidEvents(eventPool, netWorth, day, c3EncountersUsed, debt);
+    const validEvents = filterValidEvents(eventPool, netWorth, day, c3EncountersUsed, debt, locObj);
     
     if (validEvents.length === 0) return handleRecalcPrices(locObj);
 

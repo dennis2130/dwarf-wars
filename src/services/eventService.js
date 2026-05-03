@@ -15,7 +15,7 @@ export const calculateNetWorth = (resources, currentPrices, handleSellPrice) => 
     return resources.money + inventoryValue;
 };
 
-export const filterValidEvents = (eventPool, netWorth, day, c3EncountersUsed, debt) => {
+export const filterValidEvents = (eventPool, netWorth, day, c3EncountersUsed, debt, location) => {
     return eventPool.filter(e => {
         const conf = e.config || {};
         
@@ -23,6 +23,13 @@ export const filterValidEvents = (eventPool, netWorth, day, c3EncountersUsed, de
         if (conf.req_debt && debt <= 0) return false;
         if (conf.req_min_day && day < conf.req_min_day) return false;
         if (conf.req_max_day && day > conf.req_max_day) return false;
+        
+        // Location filtering: if event has location restrictions, check them
+        if (e.location && location) {
+            const eventLocations = Array.isArray(e.location) ? e.location : [e.location];
+            const locationName = typeof location === 'string' ? location : location.name;
+            if (!eventLocations.includes(locationName)) return false;
+        }
         
         // C3 encounter filtering: day-based net worth thresholds
         // Applies to both type 'c3_check' and events with config.c3_encounter flag
