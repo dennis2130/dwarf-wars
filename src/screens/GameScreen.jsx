@@ -215,7 +215,7 @@ export default function GameScreen({
                     <><Map size={20}/> Travel to New Location</>
                 ) : (
                     // STANDARD WORK
-                    <><Map size={20}/> Work & Travel (50-200g)</>
+                    <><Map size={20}/> Work & Travel (250-500g)</>
                 )}
             </button>
 
