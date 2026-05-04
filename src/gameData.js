@@ -2,7 +2,7 @@ import filter from 'leo-profanity';
 
 // --- METADATA ---
 export const GAME_META = {
-    version: "v1.1.8", // Change this number here to update everywhere!
+    version: "v1.1.9", // Change this number here to update everywhere!
     studio: "2130 Studios",
     releaseNotes: [
       {

@@ -1,12 +1,16 @@
 import { Swords, Target, Users } from 'lucide-react';
 import ScrambleDie from './ScrambleDie';
 
-export default function EventModal({ event, isRolling, rollTarget, onRoll, onClose, combatActions, c3_player }) {
+export default function EventModal({ event, isRolling, rollTarget, onRoll, onClose, combatActions, c3_player, onCharityChoice }) {
     if (!event) return null;
 
+    // Parse config if it's a string (Supabase sometimes returns JSONB as string)
+    const config = typeof event.config === 'string' ? JSON.parse(event.config) : (event.config || {});
+    
     // 1. DETERMINE SKIN
     const isCombat = event.type === 'combat';
-    const isC3Event = event.type === 'c3_check' || event.config?.c3_encounter;
+    const isC3Event = event.type === 'c3_check' || config?.c3_encounter;
+    const isCharityEvent = config?.charity_amount;
     
     const theme = {
         color: isC3Event ? 'purple' : (isCombat ? 'red' : 'blue'),
@@ -27,6 +31,82 @@ export default function EventModal({ event, isRolling, rollTarget, onRoll, onClo
             : 'Adventurer';
         return text.replace('{c3_player_name}', displayName)
                    .replace('{player_name}', displayName);
+    };
+
+    // Helper: Get contextual button text based on event category
+    const getCharityButtonText = (category) => {
+        const buttonMap = {
+            'charity': ['Show Compassion', 'Turn Away'],
+            'mercy': ['Show Mercy', 'Show None'],
+            'rescue': ['Save Them', 'Walk Away'],
+            'heroism': ['Be A Hero', 'Ignore'],
+            'kindness': ['Show Kindness', 'Ignore'],
+            'compassion': ['Show Compassion', 'Turn Away'],
+            'aid': ['Offer Aid', 'Ignore'],
+            'courtesy': ['Help Them', 'Ignore'],
+            'help': ['Help Them', 'Walk Away']
+        };
+        return buttonMap[category?.toLowerCase()] || ['Give Aid', 'Do Nothing'];
+    };
+    
+    const charityButtonsText = getCharityButtonText(config?.category);
+
+    // Helper: Get appropriate title based on event type and category
+    const getEventTitle = () => {
+        if (isCharityEvent) {
+            const titleMap = {
+                'charity': 'A Moral Choice',
+                'mercy': 'Justice or Mercy?',
+                'rescue': 'A Rescue Opportunity',
+                'heroism': 'A Heroic Moment',
+                'kindness': 'An Act of Kindness',
+                'compassion': 'A Test of Compassion',
+                'aid': 'Those in Need',
+                'courtesy': 'A Courtesy',
+                'help': 'Someone Needs Help'
+            };
+            return titleMap[config?.category?.toLowerCase()] || 'A Moral Choice';
+        }
+        if (isCombat) return 'Combat Encounter';
+        if (isC3Event) return `${config?.stat ? config.stat.charAt(0).toUpperCase() + config.stat.slice(1) : 'Charisma'} - Ally Encounter`;
+        if (event.type === 'check') return `${config?.stat ? config.stat.charAt(0).toUpperCase() + config.stat.slice(1) : 'Unknown'} Check`;
+        return 'Encounter';
+    };
+    
+    const eventTitle = getEventTitle();
+
+    // Helper: Get contextual helper text based on event category
+    const getCharityHelperText = (category) => {
+        const textMap = {
+            'charity': 'Will you show compassion to those in need?',
+            'mercy': 'Will you show mercy or demand justice?',
+            'rescue': 'Will you save them or walk away?',
+            'heroism': 'Will you be a hero or ignore their plight?',
+            'kindness': 'Will you show kindness in their time of need?',
+            'compassion': 'Will you show compassion?',
+            'aid': 'Will you offer aid or turn away?',
+            'courtesy': 'Will you help them find their way?',
+            'help': 'Will you help them or walk away?'
+        };
+        return textMap[category?.toLowerCase()] || 'Will you act with compassion or remain indifferent?';
+    };
+    
+    const charityHelperText = getCharityHelperText(config?.category);
+
+    // Helper: Get button text based on check type
+    const getCheckActionText = (stat) => {
+        if (!stat) return 'ATTEMPT';
+        const statLower = stat.toLowerCase();
+        const actionMap = {
+            'wisdom': 'REASON',
+            'charisma': 'PERSUADE',
+            'stealth': 'SNEAK',
+            'intelligence': 'ANALYZE',
+            'dexterity': 'EVADE',
+            'constitution': 'ENDURE',
+            'combat': 'FIGHT!'
+        };
+        return actionMap[statLower] || 'ATTEMPT';
     };
 
     // 2. RENDER RESULT STATE
@@ -96,7 +176,7 @@ export default function EventModal({ event, isRolling, rollTarget, onRoll, onClo
             <div className={`rounded-xl p-6 w-full max-w-sm text-center shadow-2xl border-2 animate-in zoom-in duration-200 bg-slate-900 ${theme.borderColor}`}>
                 
                 <h2 className={`text-xl font-bold mb-4 text-white uppercase tracking-widest`}>
-                    {isC3Event ? `${event.config?.stat ? event.config.stat.charAt(0).toUpperCase() + event.config.stat.slice(1) : 'Charisma'} - Ally Encounter` : `${event.config.stat} CHECK`}
+                    {eventTitle}
                 </h2>
 
                 {/* C3 PLAYER BADGE */}
@@ -140,26 +220,73 @@ export default function EventModal({ event, isRolling, rollTarget, onRoll, onClo
                     </div>
                 )}
 
-                <div className="flex gap-3">
-                    {isCombat && (
-                        <button onClick={combatActions.onRun} disabled={isRolling} className="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 py-3 rounded disabled:opacity-50 font-bold">
-                            Run Away
+                {/* CHARITY CHOICE EVENTS: Contextual choice buttons (PRIORITY: Check FIRST) */}
+                {isCharityEvent && !event.result && (
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={() => onCharityChoice('nothing')} 
+                            disabled={isRolling} 
+                            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-3 rounded disabled:opacity-50 font-bold"
+                        >
+                            {charityButtonsText[1]}
                         </button>
-                    )}
+                        <button 
+                            onClick={() => onCharityChoice('give')} 
+                            disabled={isRolling} 
+                            className="flex-1 bg-amber-600 hover:bg-amber-500 text-white py-3 rounded disabled:opacity-50 font-bold"
+                        >
+                            {charityButtonsText[0]}
+                        </button>
+                    </div>
+                )}
 
-                    {isC3Event && (
-                        <button onClick={combatActions.onWalkAway} disabled={isRolling} className="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 py-3 rounded disabled:opacity-50 font-bold">
-                            Walk Away
+                {/* NON-CHARITY VILLAGER ENCOUNTERS: Help/Ignore buttons */}
+                {event.type === 'encounter' && !isCharityEvent && !event.result && (
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={() => onRoll(event)} 
+                            disabled={isRolling} 
+                            className="flex-1 bg-green-700 hover:bg-green-600 text-white py-3 rounded disabled:opacity-50 font-bold"
+                        >
+                            Help
                         </button>
-                    )}
-                    
-                    <button onClick={onRoll} disabled={isRolling} className={`flex-1 text-white font-bold py-3 rounded disabled:opacity-50 shadow-lg ${isC3Event ? 'bg-purple-600 hover:bg-purple-500' : (isCombat ? 'bg-red-700 hover:bg-red-600' : 'bg-blue-600 hover:bg-blue-500 w-full')}`}>
-                        {isRolling ? "ROLLING..." : (isC3Event ? "HELP ALLY" : (isCombat ? "FIGHT!" : "ROLL D20"))}
-                    </button>
-                </div>
+                        <button 
+                            onClick={onClose} 
+                            disabled={isRolling} 
+                            className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-3 rounded disabled:opacity-50 font-bold"
+                        >
+                            Ignore
+                        </button>
+                    </div>
+                )}
+
+                {/* C3 CHECK & COMBAT & CHECK: Standard buttons (Skip if charity event) */}
+                {!isCharityEvent && (isC3Event || isCombat || event.type === 'check') && !event.result && (
+                    <div className="flex gap-3">
+                        {isCombat && (
+                            <button onClick={combatActions.onRun} disabled={isRolling} className="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 py-3 rounded disabled:opacity-50 font-bold">
+                                Run Away
+                            </button>
+                        )}
+
+                        {isC3Event && (
+                            <button onClick={onClose} disabled={isRolling} className="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 py-3 rounded disabled:opacity-50 font-bold">
+                                Decline
+                            </button>
+                        )}
+                        
+                        <button onClick={onRoll} disabled={isRolling} className={`flex-1 text-white font-bold py-3 rounded disabled:opacity-50 shadow-lg ${
+                            isC3Event 
+                                ? 'bg-purple-600 hover:bg-purple-500' 
+                                : (isCombat ? 'bg-red-700 hover:bg-red-600' : 'bg-blue-700 hover:bg-blue-600')
+                        }`}>
+                            {isRolling ? "ROLLING..." : (isC3Event ? "HELP" : getCheckActionText(config?.stat))}
+                        </button>
+                    </div>
+                )}
                 
                 <div className="mt-2 text-[10px] text-slate-500">
-                    {isC3Event ? "You can choose to help with a risky roll or walk away safely..." : `DC ${event.config.difficulty} • Total to Beat: ${event.config.difficulty}`}
+                    {isCharityEvent ? charityHelperText : (event.type === 'encounter' ? "You can choose to help this person or ignore their plight..." : (isC3Event ? "You can choose to help with a risky roll or walk away safely..." : `DC ${config.difficulty} • Total to Beat: ${config.difficulty}`))}
                 </div>
             </div>
         </div>

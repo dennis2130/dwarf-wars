@@ -62,6 +62,7 @@ function App() {
   const [c3EncountersUsed, setC3EncountersUsed] = useState(0);
   const [c3EncountersRemoved, setC3EncountersRemoved] = useState(false);
   const [c3Player, setC3Player] = useState(null);
+  const [statPenalties, setStatPenalties] = useState({}); // {wisdom: -2, charisma: 1, ...}
   const DEBUG_GAMERTAG = import.meta.env.VITE_DEBUG_GAMERTAG;
   const isChannel3 = window.location.hostname.includes('channel3.gg');
 
@@ -646,6 +647,7 @@ function App() {
 
   // --- HELPER: EVENT OUTCOMES ---
   const applyOutcomeEffect = (effect) => {
+      if (!effect) return '';
       let summary = [];
 
       const formatSignedValue = (value, suffix = '') => {
@@ -685,6 +687,32 @@ function App() {
               summary.push(formatSignedValue(effect.health, ' HP'));
           }
       }
+
+      // NEW: Stat Penalties (Permanent)
+      const statPenaltyKeys = ['wisdom_loss', 'charisma_loss', 'stealth_loss', 'intelligence_loss', 'dexterity_loss', 'constitution_loss', 'combat_loss'];
+      statPenaltyKeys.forEach(key => {
+          if (effect[key]) {
+              const statName = key.replace('_loss', '');
+              setStatPenalties(prev => ({
+                  ...prev,
+                  [statName]: (prev[statName] || 0) + effect[key]
+              }));
+              summary.push(`-${effect[key]} ${statName.charAt(0).toUpperCase() + statName.slice(1)}`);
+          }
+      });
+
+      // NEW: Stat Gains (Permanent)
+      const statGainKeys = ['wisdom_gain', 'charisma_gain', 'stealth_gain', 'intelligence_gain', 'dexterity_gain', 'constitution_gain', 'combat_gain'];
+      statGainKeys.forEach(key => {
+          if (effect[key]) {
+              const statName = key.replace('_gain', '');
+              setStatPenalties(prev => ({
+                  ...prev,
+                  [statName]: (prev[statName] || 0) - effect[key]  // Negative penalty = positive gain
+              }));
+              summary.push(`+${effect[key]} ${statName.charAt(0).toUpperCase() + statName.slice(1)}`);
+          }
+      });
 
       // Gems
       if (effect.gems) {
@@ -842,6 +870,7 @@ function App() {
     setC3EncountersUsed(0);
     setC3EncountersRemoved(false);
     setC3Player(null);
+    setStatPenalties({}); // Reset stat penalties
 
     // 2. Handle Randomization
     let selectedRace = buildSelection.race; 
@@ -906,7 +935,7 @@ function App() {
 
     // Calculate Net Worth and filter/select event using service
     const netWorth = calculateNetWorth(resources, currentPrices, handleSellPrice);
-    const validEvents = filterValidEvents(eventPool, netWorth, day, c3EncountersUsed, debt, locObj);
+    const validEvents = filterValidEvents(eventPool, netWorth, day, c3EncountersUsed, debt, locObj.name);
     
     if (validEvents.length === 0) return handleRecalcPrices(locObj);
 
@@ -1006,6 +1035,15 @@ function App() {
         setLog(prev => [msg, ...prev]);
         return handleRecalcPrices(locObj);
     }
+
+    // Handle villager encounters (type: 'encounter')
+    if (event.type === 'encounter') {
+        setActiveEvent({
+            ...event,
+            result: null
+        });
+        return handleRecalcPrices(locObj);
+    }
     
     // 4. SIMPLE EVENTS
     let msg = event.text;
@@ -1053,10 +1091,66 @@ function App() {
       setTimeout(() => { finishEvent(rollTarget); setIsRolling(false); setRollTarget(null); }, 800);
   };
 
+  const handleCharityChoice = (choice) => {
+      if (!activeEvent) return;
+      
+      const charityAmount = activeEvent.config?.charity_amount || 50000;
+      
+      if (choice === 'give') {
+          // Check if player has enough gold
+          if (resources.money < charityAmount) {
+              setLog(prev => [`You don't have enough gold to give...`, ...prev]);
+              triggerFlash('red');
+              closeEventModal();
+              return;
+          }
+          
+          // Deduct gold
+          updateMoney(-charityAmount);
+          
+          // Log the generous choice
+          const msg = `You showed compassion and gave ${charityAmount.toLocaleString()} Gold to those in need.`;
+          setLog(prev => [msg, ...prev]);
+          triggerFlash('green');
+      } else {
+          // choice === 'nothing'
+          const msg = `You turned away and did nothing.`;
+          setLog(prev => [msg, ...prev]);
+          triggerFlash('slate');
+      }
+      
+      // Close modal after a short delay
+      setTimeout(() => closeEventModal(), 500);
+  };
+
   const finishEvent = (d20) => {
         if (!activeEvent) return;
+        
+        // SPECIAL HANDLING: Villager encounters (no roll needed, immediate outcome)
+        if (activeEvent.type === 'encounter') {
+            const helpOutcome = activeEvent.config?.outcomes?.help;
+            if (helpOutcome) {
+                const effectText = applyOutcomeEffect(helpOutcome.effect);
+                triggerFlash('green');
+                setLog(prev => [`[ENCOUNTER] ${helpOutcome.text}`, ...prev]);
+                
+                setActiveEvent(prev => ({
+                    ...prev,
+                    result: {
+                        outcome: 'help',
+                        text: helpOutcome.text,
+                        effectText: effectText,
+                        roll: 20,
+                        bonus: 0,
+                        total: 20
+                    }
+                }));
+            }
+            return;
+        }
+        
         const config = activeEvent.config;
-        const bonus = getEventRollBonusBreakdown(activeEvent, player.race, player.class, combatBonus, playerItems).total;
+        const bonus = getEventRollBonusBreakdown(activeEvent, player.race, player.class, combatBonus, playerItems, statPenalties).total;
         const trackedMonsterSlug = activeEvent.type === 'combat'
             ? String(activeEvent.slug || '').trim().toLowerCase()
             : '';
@@ -1286,13 +1380,19 @@ function App() {
     }
     setHasTraded(false); 
     let nextLoc;
-    do { nextLoc = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)]; } 
-    while (nextLoc.name === currentLocation.name);
+    // DEV: Set to true to lock testing to Royal City
+    const DEV_LOCK_ROYAL_CITY = false;
+    if (DEV_LOCK_ROYAL_CITY) {
+      nextLoc = LOCATIONS.find(l => l.name === 'The Royal City');
+    } else {
+      do { nextLoc = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)]; } 
+      while (nextLoc.name === currentLocation.name);
+    }
     setCurrentLocation(nextLoc);
     triggerRandomEvent(nextLoc);
   };
 
-    const activeEventBonus = getEventRollBonusBreakdown(activeEvent, player.race, player.class, combatBonus, playerItems);
+    const activeEventBonus = getEventRollBonusBreakdown(activeEvent, player.race, player.class, combatBonus, playerItems, statPenalties);
 
   return (
     <>
@@ -1302,9 +1402,9 @@ function App() {
     <div className="text-yellow-500 text-xs tracking-[0.5em] font-bold animate-pulse mb-2">LOADING REALM...</div>
 
     {/* NEW STUDIO & VERSION INFO */}
-    <div className="flex flex-col items-center gap-1 opacity-50 animate-in slide-in-from-bottom-4 duration-1000 delay-500">
-        <span className="text-[10px] text-slate-400 font-mono uppercase tracking-widest">{GAME_META.studio}</span>
-        <span className="text-[9px] text-slate-600 font-mono">{GAME_META.version}</span>
+    <div className="flex flex-col items-center gap-1 opacity-75 animate-in slide-in-from-bottom-4 duration-1000 delay-500">
+        <span className="text-sm text-slate-200 font-mono uppercase tracking-widest font-bold">{GAME_META.studio}</span>
+        <span className="text-xs text-slate-300 font-mono">{GAME_META.version}</span>
     </div>
   </div>
 
@@ -1351,6 +1451,7 @@ function App() {
           // UNIFIED HANDLERS
           onRoll={startRoll}
           onClose={closeEventModal}
+          onCharityChoice={handleCharityChoice}
           c3_player={c3Player}
           debugGamertag={DEBUG_GAMERTAG}
       />}

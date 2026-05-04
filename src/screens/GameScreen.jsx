@@ -19,6 +19,7 @@ export default function GameScreen({
     combatActions, hasTraded, 
     onRoll, // Generic Roll Handler (startRoll)
     onClose, // Generic Close Handler (closeEventModal)
+    onCharityChoice, // Handler for charity choice events
     onWork, 
     userProfile, 
     debugGamertag,
@@ -237,6 +238,7 @@ export default function GameScreen({
                 rollTarget={rollTarget}
                 onRoll={onRoll}
                 onClose={onClose}
+                onCharityChoice={onCharityChoice}
                 c3_player={c3_player}
                 combatActions={{
                     onRollComplete: combatActions.onRollComplete,

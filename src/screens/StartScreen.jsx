@@ -178,6 +178,8 @@ export default function StartScreen({
                         
                         <p className='text-yellow-400 text-sm mt-1 leading-snug font-bold'>The Royal City</p>
                         <p className="text-white font-extrabold text-sm leading-tight">5/30/2026</p>
+                        <br></br>
+                        <a href="https://channel3.gg/event/2228" target="_blank" rel="noopener noreferrer" className="text-slate-400 text-xs mt-1 block">Register Now</a>
                     </div>
                 </div>
             </div>

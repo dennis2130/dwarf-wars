@@ -23,7 +23,7 @@ export const formatStatLabel = (statName) => {
     return statName.charAt(0).toUpperCase() + statName.slice(1);
 };
 
-export const getEventRollBonusBreakdown = (event, playerRace, playerClass, combatBonus, playerItems = []) => {
+export const getEventRollBonusBreakdown = (event, playerRace, playerClass, combatBonus, playerItems = [], statPenalties = {}) => {
     if (!event || !event.config?.stat) return { total: 0, breakdown: [] };
 
     const stat = normalizeStatName(event.config.stat);
@@ -40,6 +40,13 @@ export const getEventRollBonusBreakdown = (event, playerRace, playerClass, comba
     if (classStatBonus !== 0) {
         breakdown.push({ label: `${playerClass.name} ${formatStatLabel(stat)}`, value: classStatBonus });
         total += classStatBonus;
+    }
+
+    // Add stat penalties/gains
+    const statPenalty = statPenalties[stat] || 0;
+    if (statPenalty !== 0) {
+        breakdown.push({ label: `Active Penalty`, value: statPenalty });
+        total += statPenalty;
     }
 
     // Combat-specific sources are additive with general race/class stat bonuses.

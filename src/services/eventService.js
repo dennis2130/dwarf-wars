@@ -24,11 +24,11 @@ export const filterValidEvents = (eventPool, netWorth, day, c3EncountersUsed, de
         if (conf.req_min_day && day < conf.req_min_day) return false;
         if (conf.req_max_day && day > conf.req_max_day) return false;
         
-        // Location filtering: if event has location restrictions, check them
-        if (e.location && location) {
-            const eventLocations = Array.isArray(e.location) ? e.location : [e.location];
+        // Location filtering: if event has location_filter restrictions, check them
+        if (e.location_filter && e.location_filter.trim()) {
             const locationName = typeof location === 'string' ? location : location.name;
-            if (!eventLocations.includes(locationName)) return false;
+            const allowedLocations = e.location_filter.split(',').map(loc => loc.trim());
+            if (!allowedLocations.includes(locationName)) return false;
         }
         
         // C3 encounter filtering: day-based net worth thresholds
