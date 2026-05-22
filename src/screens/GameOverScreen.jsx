@@ -1,12 +1,23 @@
 import React from 'react';
 import { Skull, Trophy, Lock, Ban, HeartCrack, Gavel, ArrowLeft } from 'lucide-react'; // <-- ADD ArrowLeft here
 
-export default function GameOverScreen({ money, debt, health, race, isSaving, onRestart, isChannel3 }) { // <-- ADD isChannel3 prop
+export default function GameOverScreen({ money, debt, health, race, playerClass, isSaving, onRestart, isChannel3 }) { // <-- ADD isChannel3 prop
     // Logic: Victory only happens if Debt is 0. 
     // Even if you are rich, if you didn't pay the debt, you lose.
     const isDead = health <= 0;
     const hasDebt = debt > 0;
     const canCoverDebt = money >= debt;
+
+    const getArticleForRace = (raceName = '') => {
+        if (!raceName) return 'a';
+        if (/^human/i.test(raceName)) return 'a';
+        return /^[aeiou]/i.test(raceName) ? 'an' : 'a';
+    };
+
+    const raceLabel = race || 'Wanderer';
+    const classLabel = playerClass || 'Adventurer';
+    const buildLabel = `${getArticleForRace(raceLabel)} ${raceLabel} ${classLabel}`;
+    const withBuildPrefix = (text) => `As ${buildLabel}, ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
     
     // Calculate Final Score (Net Worth)
     const finalScore = money - debt;
@@ -32,25 +43,25 @@ export default function GameOverScreen({ money, debt, health, race, isSaving, on
             // Scenario 1: Alive, Wealthy, but didn't pay
             scenario.title = "ASSETS SEIZED";
             scenario.icon = <Gavel size={64} />;
-            scenario.description = "The Obsidian Vault found you. You had the gold to pay, but greed stayed your hand.";
+            scenario.description = withBuildPrefix("The Obsidian Vault found you. You had the gold to pay, but greed stayed your hand.");
             scenario.quote = "\"They took your life, then they took your gold. A waste of both.\"";
         } else if (!isDead && !canCoverDebt) {
             // Scenario 2: Alive, Poor, in debt
             scenario.title = "IMPRISONED";
             scenario.icon = <Lock size={64} />;
-            scenario.description = "You failed to pay. The Vault has dragged you to the deep mines.";
+            scenario.description = withBuildPrefix("You failed to pay. The Vault has dragged you to the deep mines.");
             scenario.quote = "\"You will work off your debt, one swing of the pickaxe at a time.\"";
         } else if (isDead && canCoverDebt) {
             // Scenario 3: Dead, Wealthy, in debt
             scenario.title = "POSTHUMOUS COLLECTION";
             scenario.icon = <Skull size={64} />;
-            scenario.description = "You died rich, but in debt. The Vault looted your corpse to settle the account.";
+            scenario.description = withBuildPrefix("You died rich, but in debt. The Vault looted your corpse to settle the account.");
             scenario.quote = "\"Death is no escape from compound interest.\"";
         } else {
             // Scenario 4: Dead, Poor, in debt
             scenario.title = "TOTAL LOSS";
             scenario.icon = <HeartCrack size={64} />;
-            scenario.description = "You died penniless. The Obsidian Vault writes you off as a bad investment.";
+            scenario.description = withBuildPrefix("You died penniless. The Obsidian Vault writes you off as a bad investment.");
             scenario.quote = "\"No blood left to squeeze from this turnip.\"";
         }
     } else {
@@ -63,13 +74,13 @@ export default function GameOverScreen({ money, debt, health, race, isSaving, on
             // Edge Case: Paid off debt, but died (e.g. from bleed or last fight)
             scenario.title = "MARTYR'S VICTORY";
             scenario.icon = <Skull size={64} className="text-yellow-500" />;
-            scenario.description = `You fell in battle, but you died a free ${race}.`;
+            scenario.description = withBuildPrefix("You fell in battle, but you died free.");
             scenario.quote = "\"Your debts are paid. Your clan sings songs of your honor.\"";
         } else {
             // Standard Win
             scenario.title = "VICTORY";
             scenario.icon = <Trophy size={64} />;
-            scenario.description = "You navigated the dangers of the world and purchased your freedom.";
+            scenario.description = withBuildPrefix("You navigated the dangers of the world and purchased your freedom.");
             scenario.quote = "\"The Vault is satisfied. The gold you make now is finally yours.\"";
         }
     }

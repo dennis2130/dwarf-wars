@@ -1428,7 +1428,7 @@ function App() {
 
       {gameState === 'event-manager' && <EventManager onClose={() => setGameState('start')} />}
 
-      {gameState === 'gameover' && <GameOverScreen money={resources.money} debt={debt} health={health} race={player.race?.name} isSaving={isSaving} onRestart={() => setGameState('start')} isChannel3={isChannel3} />}
+    {gameState === 'gameover' && <GameOverScreen money={resources.money} debt={debt} health={health} race={player.race?.name} playerClass={player.class?.name} isSaving={isSaving} onRestart={() => setGameState('start')} isChannel3={isChannel3} />}
       
       {gameState === 'playing' && <GameScreen 
           gamertag={userProfile?.gamertag || 'Wanderer'} 
