@@ -102,7 +102,9 @@ export default function StartScreen({
             }
             return true;
         });
-        return filtered.slice(0, 20); 
+        return filtered
+            .sort((a, b) => (b.final_score || 0) - (a.final_score || 0))
+            .slice(0, 20); 
     };
 
     const listToRender = [...getFilteredLeaderboard(), ...getFilteredLeaderboard()];

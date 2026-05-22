@@ -296,18 +296,44 @@ function App() {
   };
 
   const fetchLeaderboard = async () => {
-        const { data, error } = await supabase
-            .from('high_scores')
-            .select('*')
-            .order('final_score', { ascending: false })
-            .limit(500);
+        const monthAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-        if (error) {
-            console.error('Error loading leaderboard:', error);
+        const [allTimeRes, recentRes] = await Promise.all([
+            supabase
+                .from('high_scores')
+                .select('*')
+                .order('final_score', { ascending: false })
+                .limit(500),
+            supabase
+                .from('high_scores')
+                .select('*')
+                .gte('created_at', monthAgoIso)
+                .order('created_at', { ascending: false })
+                .limit(5000)
+        ]);
+
+        if (allTimeRes.error) {
+            console.error('Error loading all-time leaderboard:', allTimeRes.error);
             return;
         }
 
-        if (!data) return;
+        if (recentRes.error) {
+            console.error('Error loading recent leaderboard:', recentRes.error);
+            return;
+        }
+
+        const allTimeData = allTimeRes.data || [];
+        const recentData = recentRes.data || [];
+
+        const mergedMap = new Map();
+        [...allTimeData, ...recentData].forEach((row) => {
+            const key = row.id ?? `${row.created_at}-${row.gamertag}-${row.final_score}`;
+            if (!mergedMap.has(key)) {
+                mergedMap.set(key, row);
+            }
+        });
+
+        const data = Array.from(mergedMap.values());
 
         // On live Channel 3 hosts, show only scores from linked Channel 3 profiles.
         if (isChannel3) {
