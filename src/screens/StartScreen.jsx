@@ -167,23 +167,13 @@ export default function StartScreen({
                 </div>
             )}
 
-            {/* CITY ART + TOURNAMENT ANNOUNCEMENT */}
-            <div className="flex items-center gap-4 mb-1 relative z-0">
+            {/* DRAGON ART */}
+            <div className="flex justify-center mb-1 relative z-0">
                 <img 
-                    src="./city.png" 
-                    alt="The Royal City" 
-                    className="h-[7.7rem] w-auto object-contain opacity-90 drop-shadow-lg flex-shrink-0" 
+                    src="./dragon.png" 
+                    alt="Dragon Hoard" 
+                    className="h-28 w-auto object-contain opacity-90 drop-shadow-lg" 
                 />
-                <div className="flex items-center gap-3 flex-1">
-                    <div className="text-center flex-1">
-                        <p className="text-white font-bold text-lg leading-tight">C3 Championship Series</p>
-                        
-                        <p className='text-yellow-400 text-sm mt-1 leading-snug font-bold'>The Royal City</p>
-                        <p className="text-white font-extrabold text-sm leading-tight">5/30/2026</p>
-                        <br></br>
-                        <a href="https://channel3.gg/event/2228" target="_blank" rel="noopener noreferrer" className="text-slate-400 text-xs mt-1 block">Register Now</a>
-                    </div>
-                </div>
             </div>
 
             {/* LEADERBOARD CONTAINER */}
